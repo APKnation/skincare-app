@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:postgres/postgres.dart';
+import 'pg.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
@@ -79,7 +80,7 @@ const productColumns =
     'shop_location,approval,created_at';
 
 Future<Map<String, Object?>?> findUser(Ctx ctx, String id) async =>
-    (await ctx.db.execute(
+    (await ctx.db.q(
       'SELECT $userColumns FROM users WHERE id = @id',
       parameters: {'id': id},
     )).firstOrNull?.toColumnMap();
@@ -90,9 +91,9 @@ Future<Map<String, Object?>?> requireAuth(
   final header = request.headers['authorization'] ?? '';
   final token = header.startsWith('Bearer ') ? header.substring(7) : '';
   if (token.isEmpty) return null;
-  final rows = await ctx.db.execute(
-    'SELECT $userColumns FROM sessions s JOIN users u ON u.id = s.user_id '
-    'WHERE s.token = @token',
+  final rows = await ctx.db.q(
+    'SELECT $userColumns FROM users '
+    'WHERE id = (SELECT user_id FROM sessions WHERE token = @token)',
     parameters: {'token': token},
   );
   final user = rows.firstOrNull?.toColumnMap();
@@ -102,7 +103,7 @@ Future<Map<String, Object?>?> requireAuth(
 
 Future<Response> _createSession(Ctx ctx, String userId) async {
   final token = randomId(24);
-  await ctx.db.execute(
+  await ctx.db.q(
     'INSERT INTO sessions (token, user_id) VALUES (@t,@u)',
     parameters: {'t': token, 'u': userId},
   );
@@ -115,7 +116,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
   router.post('/api/auth/register', (Request request) async {
     final body = await readBody(request);
     final email = (body['email'] as String).trim().toLowerCase();
-    final exists = await ctx.db.execute(
+    final exists = await ctx.db.q(
       'SELECT 1 FROM users WHERE lower(email) = @e',
       parameters: {'e': email},
     );
@@ -123,7 +124,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
       return fail('An account with this email already exists.', status: 409);
     }
     final salt = makeSalt();
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       '''INSERT INTO users (name, email, phone, password_hash, password_salt)
          VALUES (@n,@e,@p,@h,@s) RETURNING id''',
       parameters: {
@@ -139,7 +140,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
 
   router.post('/api/auth/login', (Request request) async {
     final body = await readBody(request);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       'SELECT id, password_hash, password_salt, deactivated FROM users '
       'WHERE lower(email) = @e',
       parameters: {'e': (body['email'] as String).trim().toLowerCase()},
@@ -160,7 +161,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
   router.post('/api/auth/logout', (Request request) async {
     final header = request.headers['authorization'] ?? '';
     if (header.startsWith('Bearer ')) {
-      await ctx.db.execute('DELETE FROM sessions WHERE token = @t',
+      await ctx.db.q('DELETE FROM sessions WHERE token = @t',
           parameters: {'t': header.substring(7)});
     }
     return json({'ok': true});
@@ -177,14 +178,14 @@ void registerCoreRoutes(Router router, Ctx ctx) {
     if (user == null) return fail('Not logged in.', status: 401);
     final body = await readBody(request);
     final email = (body['email'] as String).trim().toLowerCase();
-    final clash = (await ctx.db.execute(
+    final clash = (await ctx.db.q(
       'SELECT 1 FROM users WHERE lower(email) = @e AND id <> @id',
       parameters: {'e': email, 'id': user['id']},
     )).firstOrNull;
     if (clash != null) {
       return fail('That email belongs to another account.', status: 409);
     }
-    await ctx.db.execute(
+    await ctx.db.q(
       'UPDATE users SET name = @n, email = @e, phone = @p WHERE id = @id',
       parameters: {
         'n': (body['name'] as String).trim(),
@@ -200,7 +201,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
     final user = await requireAuth(ctx, request, null);
     if (user == null) return fail('Not logged in.', status: 401);
     final body = await readBody(request);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       'SELECT password_hash, password_salt FROM users WHERE id = @id',
       parameters: {'id': user['id']},
     );
@@ -214,7 +215,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
       return fail('New password must be at least 6 characters.');
     }
     final salt = makeSalt();
-    await ctx.db.execute(
+    await ctx.db.q(
       'UPDATE users SET password_hash = @h, password_salt = @s WHERE id = @id',
       parameters: {
         'h': hashPassword(next, salt),
@@ -233,7 +234,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
       return fail('Your seller application is already under review.');
     }
     final body = await readBody(request);
-    await ctx.db.execute(
+    await ctx.db.q(
       '''UPDATE users SET seller_status = 'pending', shop_name = @sn,
          shop_location = @sl, shop_description = @sd, contact_info = @ci
          WHERE id = @id''',
@@ -249,7 +250,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
   });
 
   router.get('/api/products', (Request request) async {
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       "SELECT $productColumns FROM products WHERE approval = 'approved' "
       'ORDER BY created_at DESC',
     );
@@ -259,7 +260,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
   router.get('/api/products/mine', (Request request) async {
     final user = await requireAuth(ctx, request, null);
     if (user == null) return fail('Not logged in.', status: 401);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       'SELECT $productColumns FROM products WHERE seller_id = @id '
       'ORDER BY created_at DESC',
       parameters: {'id': user['id']},
@@ -270,7 +271,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
   router.get('/api/me/skin-profile', (Request request) async {
     final user = await requireAuth(ctx, request, null);
     if (user == null) return fail('Not logged in.', status: 401);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       'SELECT skin_type, concerns, sensitivities, goals, notes, updated_at '
       'FROM skin_profiles WHERE user_id = @id',
       parameters: {'id': user['id']},
@@ -292,7 +293,7 @@ void registerCoreRoutes(Router router, Ctx ctx) {
     final user = await requireAuth(ctx, request, null);
     if (user == null) return fail('Not logged in.', status: 401);
     final body = await readBody(request);
-    await ctx.db.execute(
+    await ctx.db.q(
       '''INSERT INTO skin_profiles (user_id, skin_type, concerns,
            sensitivities, goals, notes, updated_at)
          VALUES (@id,@st,@c,@s,@g,@n,now())

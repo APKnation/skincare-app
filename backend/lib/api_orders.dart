@@ -4,6 +4,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
 import 'api_core.dart';
+import 'pg.dart';
 
 final _rng = Random.secure();
 
@@ -20,7 +21,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
   router.get('/api/me/cart', (Request request) async {
     final user = await auth(request);
     if (user == null) return fail('Not logged in.', status: 401);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       'SELECT product_id, quantity FROM cart_items WHERE user_id = @id',
       parameters: {'id': user['id']},
     );
@@ -44,7 +45,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     if (current + quantity > stock) {
       return fail('Only $stock left in stock.');
     }
-    await ctx.db.execute(
+    await ctx.db.q(
       '''INSERT INTO cart_items (user_id, product_id, quantity)
          VALUES (@u,@p,@q)
          ON CONFLICT (user_id, product_id)
@@ -60,7 +61,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     final body = await readBody(request);
     final quantity = (body['quantity'] as num).toInt();
     if (quantity <= 0) {
-      await ctx.db.execute(
+      await ctx.db.q(
         'DELETE FROM cart_items WHERE user_id = @u AND product_id = @p',
         parameters: {'u': user['id'], 'p': productId},
       );
@@ -68,7 +69,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     }
     final stock = await _stockOf(ctx, productId);
     if (stock == null) return fail('Product unavailable.', status: 404);
-    await ctx.db.execute(
+    await ctx.db.q(
       '''INSERT INTO cart_items (user_id, product_id, quantity)
          VALUES (@u,@p,@q)
          ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = @q2''',
@@ -85,7 +86,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
   router.delete('/api/me/cart', (Request request) async {
     final user = await auth(request);
     if (user == null) return fail('Not logged in.', status: 401);
-    await ctx.db.execute(
+    await ctx.db.q(
       'DELETE FROM cart_items WHERE user_id = @u',
       parameters: {'u': user['id']},
     );
@@ -96,7 +97,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     final user = await auth(request);
     if (user == null) return fail('Not logged in.', status: 401);
     final body = await readBody(request);
-    final cart = await ctx.db.execute(
+    final cart = await ctx.db.q(
       '''SELECT c.product_id, p.name, p.price_tzs, c.quantity, p.stock,
                 p.approval
          FROM cart_items c JOIN products p ON p.id = c.product_id
@@ -120,7 +121,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
         'SY${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
     final method = body['paymentMethod'] as String;
     await ctx.db.runTx((tx) async {
-      await tx.execute(
+      await tx.q(
         '''INSERT INTO orders (id, user_id, subtotal_tzs, delivery_fee_tzs,
              total_tzs, recipient_name, recipient_phone, address, city,
              delivery_notes, payment_method, payment_status, status)
@@ -141,7 +142,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
         },
       );
       for (final l in cart) {
-        await tx.execute(
+        await tx.q(
           '''INSERT INTO order_lines (order_id, product_id, name,
                unit_price_tzs, quantity)
              VALUES (@o,@p,@n,@price,@q)''',
@@ -153,7 +154,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
             'q': l['quantity'],
           },
         );
-        final updated = await tx.execute(
+        final updated = await tx.q(
           '''UPDATE products SET stock = stock - @q
              WHERE id = @p AND stock >= @q RETURNING id''',
           parameters: {'q': l['quantity'], 'p': l['product_id']},
@@ -162,12 +163,12 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
           throw StateError('Stock changed for ${l['name']}.');
         }
       }
-      await tx.execute(
+      await tx.q(
         '''INSERT INTO order_events (order_id, status, note, at)
            VALUES (@o,'placed','Order received', now())''',
         parameters: {'o': orderId},
       );
-      await tx.execute(
+      await tx.q(
         'DELETE FROM cart_items WHERE user_id = @u',
         parameters: {'u': user['id']},
       );
@@ -196,7 +197,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
   router.post('/api/orders/<id>/pay/start', (Request request, String id) async {
     final user = await auth(request);
     if (user == null) return fail('Not logged in.', status: 401);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       'SELECT payment_method, payment_status, total_tzs, recipient_phone, user_id '
       'FROM orders WHERE id = @id',
       parameters: {'id': id},
@@ -208,7 +209,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     if (o['payment_status'] == 'paid') return fail('Already paid.');
     final reference =
         'SY${DateTime.now().millisecondsSinceEpoch}${String.fromCharCode(65 + _rng.nextInt(26))}${_rng.nextInt(9000) + 1000}';
-    await ctx.db.execute(
+    await ctx.db.q(
       '''UPDATE orders SET payment_status = 'verifying', payment_ref = @r
          WHERE id = @id''',
       parameters: {'r': reference, 'id': id},
@@ -227,7 +228,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     if (user == null) return fail('Not logged in.', status: 401);
     final body = await readBody(request);
     final pin = body['pin'] as String;
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       'SELECT payment_status, user_id, payment_ref FROM orders WHERE id = @id',
       parameters: {'id': id},
     );
@@ -237,7 +238,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     }
     final declined = !RegExp(r'^\d{4}$').hasMatch(pin) || pin == '0000';
     if (declined) {
-      await ctx.db.execute(
+      await ctx.db.q(
         '''UPDATE orders SET payment_status = 'failed' WHERE id = @id''',
         parameters: {'id': id},
       );
@@ -248,12 +249,12 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     }
     // Authoritative verification happens HERE, server-side, exactly like a
     // provider callback would. The client can never mark an order paid.
-    await ctx.db.execute(
+    await ctx.db.q(
       '''UPDATE orders SET payment_status = 'paid', status = 'confirmed'
          WHERE id = @id''',
       parameters: {'id': id},
     );
-    await ctx.db.execute(
+    await ctx.db.q(
       '''INSERT INTO order_events (order_id, status, note, at)
          VALUES (@id,'confirmed','Payment verified by provider', now())''',
       parameters: {'id': id},
@@ -264,7 +265,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
   router.put('/api/orders/<id>/cancel', (Request request, String id) async {
     final user = await auth(request);
     if (user == null) return fail('Not logged in.', status: 401);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       'SELECT status, user_id FROM orders WHERE id = @id',
       parameters: {'id': id},
     );
@@ -275,11 +276,11 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     if (o['status'] == 'delivered' || o['status'] == 'cancelled') {
       return fail('This order can no longer be cancelled.');
     }
-    await ctx.db.execute(
+    await ctx.db.q(
       '''UPDATE orders SET status = 'cancelled' WHERE id = @id''',
       parameters: {'id': id},
     );
-    await ctx.db.execute(
+    await ctx.db.q(
       '''INSERT INTO order_events (order_id, status, note, at)
          VALUES (@id,'cancelled','Cancelled by customer', now())''',
       parameters: {'id': id},
@@ -299,7 +300,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
       return fail('Your seller account is not approved yet.', status: 403);
     }
     final body = await readBody(request);
-    await ctx.db.execute(
+    await ctx.db.q(
       '''INSERT INTO products (name, brand, category, description, price_tzs,
            image_url, ingredients, suitable_skin_types, targets_concerns,
            contains_flagged, is_comedogenic, usage_instructions, side_effects,
@@ -322,7 +323,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
   router.put('/api/products/<id>', (Request request, String id) async {
     final user = await auth(request);
     if (user == null) return fail('Not logged in.', status: 401);
-    final existing = await ctx.db.execute(
+    final existing = await ctx.db.q(
       'SELECT seller_id FROM products WHERE id = @id',
       parameters: {'id': id},
     );
@@ -332,7 +333,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
       return fail('You can only edit your own products.', status: 403);
     }
     final body = await readBody(request);
-    await ctx.db.execute(
+    await ctx.db.q(
       '''UPDATE products SET ${productSets(body)} WHERE id = @id''',
       parameters: {...productParams(body), 'id': id},
     );
@@ -342,7 +343,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
   router.delete('/api/products/<id>', (Request request, String id) async {
     final user = await auth(request);
     if (user == null) return fail('Not logged in.', status: 401);
-    final existing = await ctx.db.execute(
+    final existing = await ctx.db.q(
       'SELECT seller_id FROM products WHERE id = @id',
       parameters: {'id': id},
     );
@@ -351,7 +352,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     if (user['role'] != 'admin' && row[0] != user['id']) {
       return fail('You can only delete your own products.', status: 403);
     }
-    await ctx.db.execute('DELETE FROM products WHERE id = @id',
+    await ctx.db.q('DELETE FROM products WHERE id = @id',
         parameters: {'id': id});
     return json({'ok': true});
   });
@@ -361,7 +362,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
   router.get('/api/admin/sellers', (Request request) async {
     final user = await auth(request);
     if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       "SELECT $userColumns FROM users WHERE role = 'seller' OR "
       "seller_status <> 'none' ORDER BY created_at DESC",
     );
@@ -373,7 +374,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     final user = await auth(request);
     if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
     final body = await readBody(request);
-    await ctx.db.execute(
+    await ctx.db.q(
       '''UPDATE users SET seller_status = @s,
            role = CASE WHEN @s = 'approved' THEN 'seller' ELSE role END
          WHERE id = @id''',
@@ -385,7 +386,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
   router.get('/api/admin/products', (Request request) async {
     final user = await auth(request);
     if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       "SELECT $productColumns FROM products WHERE approval = 'pending' "
       'ORDER BY created_at DESC',
     );
@@ -397,7 +398,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     final user = await auth(request);
     if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
     final body = await readBody(request);
-    await ctx.db.execute(
+    await ctx.db.q(
       'UPDATE products SET approval = @a WHERE id = @id',
       parameters: {'a': body['approval'], 'id': id},
     );
@@ -407,7 +408,7 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
   router.get('/api/admin/users', (Request request) async {
     final user = await auth(request);
     if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
-    final rows = await ctx.db.execute(
+    final rows = await ctx.db.q(
       'SELECT $userColumns FROM users WHERE role <> \'admin\' '
       'ORDER BY name',
     );
@@ -419,11 +420,11 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     final user = await auth(request);
     if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
     final body = await readBody(request);
-    await ctx.db.execute(
+    await ctx.db.q(
       'UPDATE users SET deactivated = @d WHERE id = @id AND role <> \'admin\'',
       parameters: {'d': !(body['active'] as bool), 'id': id},
     );
-    await ctx.db.execute('DELETE FROM sessions WHERE user_id = @id',
+    await ctx.db.q('DELETE FROM sessions WHERE user_id = @id',
         parameters: {'id': id});
     return json({'ok': true});
   });
@@ -439,11 +440,11 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     final user = await auth(request);
     if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
     final body = await readBody(request);
-    await ctx.db.execute(
+    await ctx.db.q(
       'UPDATE orders SET status = @s WHERE id = @id',
       parameters: {'s': body['status'], 'id': id},
     );
-    await ctx.db.execute(
+    await ctx.db.q(
       'INSERT INTO order_events (order_id, status, note, at) '
       'VALUES (@id,@s,@n,now())',
       parameters: {
@@ -496,7 +497,7 @@ String productSets(Map<String, Object?> body) =>
     _productColumnMap.entries.map((e) => '${e.value} = @${e.key}').join(', ');
 
 Future<int?> _stockOf(Ctx ctx, String productId) async {
-  final rows = await ctx.db.execute(
+  final rows = await ctx.db.q(
     "SELECT stock FROM products WHERE id = @id AND approval = 'approved'",
     parameters: {'id': productId},
   );
@@ -504,7 +505,7 @@ Future<int?> _stockOf(Ctx ctx, String productId) async {
 }
 
 Future<int> _cartQty(Ctx ctx, String userId, String productId) async {
-  final rows = await ctx.db.execute(
+  final rows = await ctx.db.q(
     'SELECT quantity FROM cart_items WHERE user_id = @u AND product_id = @p',
     parameters: {'u': userId, 'p': productId},
   );
@@ -513,7 +514,7 @@ Future<int> _cartQty(Ctx ctx, String userId, String productId) async {
 
 Future<List<Map<String, Object?>>> _ordersWhere(
     Ctx ctx, String where, Object? value) async {
-  final rows = await ctx.db.execute(
+  final rows = await ctx.db.q(
     'SELECT o.id,o.user_id,o.subtotal_tzs,o.delivery_fee_tzs,o.total_tzs,'
     'o.recipient_name,o.recipient_phone,o.address,o.city,o.delivery_notes,'
     'o.payment_method,o.payment_status,o.payment_ref,o.status,o.placed_at '
@@ -523,12 +524,12 @@ Future<List<Map<String, Object?>>> _ordersWhere(
   final orders = <Map<String, Object?>>[];
   for (final r in rows) {
     final m = r.toColumnMap();
-    final lines = await ctx.db.execute(
+    final lines = await ctx.db.q(
       'SELECT product_id,name,unit_price_tzs,quantity FROM order_lines '
       'WHERE order_id = @id',
       parameters: {'id': m['id']},
     );
-    final events = await ctx.db.execute(
+    final events = await ctx.db.q(
       'SELECT status,note,at FROM order_events WHERE order_id = @id '
       'ORDER BY at',
       parameters: {'id': m['id']},

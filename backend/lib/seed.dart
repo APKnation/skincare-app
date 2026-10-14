@@ -1,14 +1,15 @@
 import 'package:postgres/postgres.dart';
+import 'pg.dart';
 
 import 'auth.dart';
 
 Future<void> seedIfEmpty(Connection db) async {
-  final count = await db.execute('SELECT count(*) FROM users');
+  final count = await db.q('SELECT count(*) FROM users');
   if ((firstValue(count) as int) > 0) return;
 
   for (final u in _users) {
     final salt = makeSalt();
-    await db.execute(
+    await db.q(
       '''INSERT INTO users (id, name, email, phone, password_hash, password_salt,
            role, seller_status, shop_name, shop_location, shop_description, contact_info)
          VALUES (@id,@name,@email,@phone,@hash,@salt,@role,@sellerStatus,
@@ -31,7 +32,7 @@ Future<void> seedIfEmpty(Connection db) async {
   }
 
   for (final p in _products) {
-    await db.execute(
+    await db.q(
       '''INSERT INTO products (id, name, brand, category, description, price_tzs,
            ingredients, suitable_skin_types, targets_concerns, contains_flagged,
            is_comedogenic, usage_instructions, side_effects, warnings, stock,

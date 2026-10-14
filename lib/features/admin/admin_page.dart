@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../core/formatters.dart';
 import '../../data/store.dart';
 import '../../models/order.dart';
-import '../../models/product.dart';
 import '../../models/user.dart';
 
 Future<void> _run(BuildContext context, Future<String?> action) async {

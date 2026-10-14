@@ -33,9 +33,12 @@ Future<void> runMigrations(Connection db, String migrationsDir) async {
     final name = file.uri.pathSegments.last;
     if (applied.contains(name)) continue;
     stdout.writeln('applying migration $name');
-    await db.execute(file.readAsStringSync());
     await db.execute(
-      'INSERT INTO schema_migrations (name) VALUES (@name)',
+      Sql(file.readAsStringSync()),
+      queryMode: QueryMode.simple,
+    );
+    await db.execute(
+      Sql.named('INSERT INTO schema_migrations (name) VALUES (@name)'),
       parameters: {'name': name},
     );
   }
