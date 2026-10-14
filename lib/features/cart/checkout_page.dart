@@ -166,9 +166,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
-            FilledButton(
-                onPressed: _busy ? null : _placeOrder,
-                child: Text(_busy ? 'Placing order…' : 'Place order')),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                  onPressed: _busy ? null : _placeOrder,
+                  child: Text(_busy ? 'Placing order…' : 'Place order')),
+            ),
           ],
         ),
       ),

@@ -12,6 +12,7 @@ class ProductImage extends StatelessWidget {
 
   IconData get _icon => switch (product.category) {
         ProductCategory.facialOil => Icons.water_drop_outlined,
+        ProductCategory.carrierOil => Icons.eco_outlined,
         ProductCategory.bodyOil => Icons.spa_outlined,
         ProductCategory.serum => Icons.science_outlined,
         ProductCategory.moisturizer => Icons.bubble_chart_outlined,

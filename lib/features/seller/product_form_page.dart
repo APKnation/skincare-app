@@ -262,7 +262,10 @@ class _ProductFormPageState extends State<ProductFormPage> {
                     labelText:
                         'Warnings, incl. excessive use (one per line)')),
             const SizedBox(height: 20),
-            FilledButton(onPressed: _save, child: const Text('Save product')),
+            SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                    onPressed: _save, child: const Text('Save product'))),
           ],
         ),
       ),

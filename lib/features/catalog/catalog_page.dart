@@ -142,9 +142,12 @@ class _CatalogPageState extends State<CatalogPage> {
                     setSheet(() => setState(() => _maxPrice = v.round())),
               ),
               const SizedBox(height: 8),
-              FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Done')),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Done')),
+              ),
             ],
           ),
         ),
