@@ -351,17 +351,23 @@ class _OrdersTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final orders = store.allOrders;
-    if (orders.isEmpty) {
-      return const Center(child: Text('No orders yet.'));
-    }
     const next = {
       OrderStatus.placed: OrderStatus.confirmed,
       OrderStatus.confirmed: OrderStatus.onTheWay,
       OrderStatus.onTheWay: OrderStatus.delivered,
     };
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: () => store.refresh(),
+      child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12),
       children: [
+        if (orders.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 120),
+            child: Center(
+                child: Text('No orders yet — pull down to refresh.')),
+          ),
         for (final o in orders)
           Card(
             child: ExpansionTile(
@@ -425,6 +431,7 @@ class _OrdersTab extends StatelessWidget {
             ),
           ),
       ],
+      ),
     );
   }
 }

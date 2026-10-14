@@ -183,6 +183,26 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     return json(await _ordersWhere(ctx, 'WHERE o.user_id = @v', user['id'] as String));
   });
 
+  router.get('/api/orders/sales', (Request request) async {
+    final user = await auth(request);
+    if (user == null) return fail('Not logged in.', status: 401);
+    if (user['role'] != 'seller') return fail('Forbidden.', status: 403);
+    final ids = await ctx.db.q(
+      'SELECT DISTINCT ol.order_id FROM order_lines ol '
+      'JOIN products p ON p.id = ol.product_id '
+      'WHERE p.seller_id = @s',
+      parameters: {'s': user['id']},
+    );
+    final orders = <Map<String, Object?>>[];
+    for (final r in ids) {
+      final list = await _ordersWhere(ctx, 'WHERE o.id = @v', r[0] as String);
+      if (list.isNotEmpty) orders.add(list.first);
+    }
+    orders.sort((a, b) =>
+        (b['placedAt'] as String).compareTo(a['placedAt'] as String));
+    return json(orders);
+  });
+
   router.get('/api/orders/<id>', (Request request, String id) async {
     final user = await auth(request);
     if (user == null) return fail('Not logged in.', status: 401);
@@ -190,7 +210,13 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     final order = list.firstOrNull;
     if (order == null) return fail('Order not found.', status: 404);
     if (order['userId'] != user['id'] && user['role'] != 'admin') {
-      return fail('Forbidden.', status: 403);
+      if (user['role'] != 'seller') return fail('Forbidden.', status: 403);
+      final mine = await ctx.db.q(
+        'SELECT 1 FROM order_lines ol JOIN products p ON p.id = ol.product_id '
+        'WHERE ol.order_id = @o AND p.seller_id = @s',
+        parameters: {'o': id, 's': user['id']},
+      );
+      if (mine.firstOrNull == null) return fail('Forbidden.', status: 403);
     }
     return json(order);
   });

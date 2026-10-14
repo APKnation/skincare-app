@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/formatters.dart';
 import '../../data/store.dart';
+import '../../models/order.dart';
 import '../../models/product.dart';
 import '../../models/user.dart';
 import '../../widgets/product_image.dart';
+import '../orders/order_details_page.dart';
 import 'product_form_page.dart';
 
 class SellerDashboardPage extends StatefulWidget {
@@ -110,6 +112,7 @@ class _SellerDashboardPageState extends State<SellerDashboardPage> {
             .length;
         final stockUnits =
             products.fold<int>(0, (a, p) => a + p.stock);
+        final sales = widget.store.salesOrders;
         return Scaffold(
           appBar: AppBar(
             title: Column(
@@ -135,7 +138,10 @@ class _SellerDashboardPageState extends State<SellerDashboardPage> {
             icon: const Icon(Icons.add_a_photo_outlined),
             label: const Text('New product'),
           ),
-          body: ListView(
+          body: RefreshIndicator(
+            onRefresh: () => widget.store.refresh(),
+            child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 90),
             children: [
               _shopCard(me),
@@ -144,8 +150,9 @@ class _SellerDashboardPageState extends State<SellerDashboardPage> {
                 children: [
                   _stat(context, 'Listings', '${products.length}'),
                   _stat(context, 'Live', '$live'),
-                  _stat(context, 'In review', '$inReview'),
-                  _stat(context, 'Stock units', '$stockUnits'),
+                  _stat(context, 'Review', '$inReview'),
+                  _stat(context, 'Stock', '$stockUnits'),
+                  _stat(context, 'Orders', '${sales.length}'),
                 ],
               ),
               const SizedBox(height: 14),
@@ -243,7 +250,51 @@ class _SellerDashboardPageState extends State<SellerDashboardPage> {
                             store: widget.store, existing: p))),
                   ),
                 ),
+              const SizedBox(height: 14),
+              Text('Customer orders for your products',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const Text(
+                  'Pull down to refresh — you deliver and get paid once the '
+                  'marketplace confirms the order.',
+                  style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 6),
+              if (sales.isEmpty)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: const Text('No orders yet'),
+                    subtitle: Text(
+                        live == 0
+                            ? 'Get a product approved and live, and orders '
+                                'for your shop will appear here.'
+                            : 'Orders containing your live products will '
+                                'appear here for fulfilment.'),
+                  ),
+                ),
+              for (final o in sales)
+                Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primaryContainer,
+                      child: Icon(Icons.shopping_bag_outlined,
+                          color: Theme.of(context).colorScheme.primary),
+                    ),
+                    title: Text(formatTZS(o.totalTZS),
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(
+                        '${o.totalItems} item(s) · ${o.recipientName} — '
+                        '${o.city} · ${o.status.label} · '
+                        '${o.paymentStatus.label}'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => OrderDetailsPage(
+                            store: widget.store, orderId: o.id))),
+                  ),
+                ),
             ],
+          ),
           ),
         );
       },

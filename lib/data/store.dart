@@ -24,6 +24,7 @@ class Store extends ChangeNotifier {
   List<Product> _pendingProducts = const [];
   List<Product> _allProducts = const [];
   List<Order> _myOrders = const [];
+  List<Order> _salesOrders = const [];
   List<Order> _allOrders = const [];
   List<User> _sellers = const [];
   List<User> _users = const [];
@@ -107,6 +108,7 @@ class Store extends ChangeNotifier {
     _me = null;
     _cart = const [];
     _myOrders = const [];
+    _salesOrders = const [];
     _myProducts = const [];
     _profile = null;
   }
@@ -142,6 +144,7 @@ class Store extends ChangeNotifier {
       if (_me != null &&
           (_me!.role == UserRole.seller || _me!.role == UserRole.admin))
         refreshMyProducts(),
+      if (_me?.role == UserRole.seller) refreshSalesOrders(),
       if (_me?.role == UserRole.admin) refreshAdmin(),
     ]);
     notifyListeners();
@@ -188,6 +191,19 @@ class Store extends ChangeNotifier {
     _myOrders = [
       for (final o in asList(rows)) Order.fromJson(o),
     ];
+    notifyListeners();
+  }
+
+  Future<void> refreshSalesOrders() async {
+    if (_me?.role != UserRole.seller) return;
+    try {
+      final rows = await api.request('GET', '/api/orders/sales');
+      _salesOrders = [
+        for (final o in asList(rows)) Order.fromJson(o),
+      ];
+    } on Exception {
+      _salesOrders = const [];
+    }
     notifyListeners();
   }
 
@@ -474,8 +490,11 @@ class Store extends ChangeNotifier {
   // ---- orders ----
 
   List<Order> get myOrders => _myOrders;
+  List<Order> get salesOrders => _salesOrders;
 
-  Order? orderById(String id) => _myOrders.where((o) => o.id == id).firstOrNull ??
+  Order? orderById(String id) =>
+      _myOrders.where((o) => o.id == id).firstOrNull ??
+      _salesOrders.where((o) => o.id == id).firstOrNull ??
       _allOrders.where((o) => o.id == id).firstOrNull;
 
   Future<String?> placeOrder({
