@@ -167,6 +167,23 @@ class _ProductsTab extends StatelessWidget {
       length: 2,
       child: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => ProductFormPage(store: store)),
+                    ),
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: const Text('New product (with photo upload)'),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const TabBar(
             tabs: [
               Tab(text: 'Pending review'),

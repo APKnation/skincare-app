@@ -143,8 +143,75 @@ class _ProductFormPageState extends State<ProductFormPage> {
     }
   }
 
-  Widget _multiChips<T extends Enum>(
-          {required String title,
+  Widget _photoSection(BuildContext context) {
+    final url = _imgUrl.text.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Product photo', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: url.isEmpty
+              ? Container(
+                  height: 140,
+                  width: double.infinity,
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  child: Icon(Icons.add_photo_alternate_outlined,
+                      size: 42,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                )
+              : Image.network(
+                  url,
+                  height: 140,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    height: 140,
+                    width: double.infinity,
+                    color: Theme.of(context).colorScheme.surfaceContainer,
+                    child: const Icon(Icons.broken_image_outlined, size: 42),
+                  ),
+                ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: _uploading ? null : _pickAndUpload,
+                icon: _uploading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.5))
+                    : const Icon(Icons.upload_outlined),
+                label: Text(_uploading ? 'Uploading…' : 'Upload from gallery'),
+              ),
+            ),
+            if (url.isNotEmpty)
+              IconButton(
+                onPressed: () => setState(_imgUrl.clear),
+                tooltip: 'Remove photo',
+                icon: Icon(Icons.delete_outline,
+                    color: Theme.of(context).colorScheme.error),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: _imgUrl,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            labelText: 'Image URL (optional)',
+            helperText: 'Upload from gallery, or paste a direct image link',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _multiChips<T extends Enum>(          {required String title,
           required List<T> values,
           required String Function(T) label,
           required Set<T> selected}) =>
