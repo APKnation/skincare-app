@@ -13,6 +13,7 @@ enum SkinConcern {
 
 enum ProductCategory {
   facialOil,
+  carrierOil,
   bodyOil,
   serum,
   moisturizer,
@@ -52,6 +53,7 @@ extension SkinConcernName on SkinConcern {
 extension CategoryName on ProductCategory {
   String get label => switch (this) {
         ProductCategory.facialOil => 'Skincare oils',
+        ProductCategory.carrierOil => 'Carrier oils',
         ProductCategory.bodyOil => 'Body oils',
         ProductCategory.serum => 'Serums',
         ProductCategory.moisturizer => 'Moisturizers',

@@ -200,6 +200,7 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> refreshAdmin() async {
+    if (_me?.role != UserRole.admin) return;
     final sellers = await api.request('GET', '/api/admin/sellers');
     _sellers = [
       for (final u in asList(sellers)) User.fromJson(u),

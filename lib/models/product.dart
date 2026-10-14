@@ -98,7 +98,8 @@ class Product {
         id: j['id'] as String,
         name: j['name'] as String,
         brand: j['brand'] as String,
-        category: ProductCategory.values.byName(j['category'] as String),
+        category: _byName(ProductCategory.values, j['category'] as String? ?? '') ??
+            ProductCategory.other,
         description: j['description'] as String,
         priceTZS: j['priceTZS'] as int,
         imageUrl: j['imageUrl'] as String?,
@@ -117,8 +118,8 @@ class Product {
         sellerId: j['sellerId'] as String,
         shopName: j['shopName'] as String,
         shopLocation: j['shopLocation'] as String,
-        approval:
-            ProductApproval.values.byName(j['approval'] as String? ?? 'pending'),
+        approval: _byName(ProductApproval.values, j['approval'] as String? ?? '') ??
+            ProductApproval.pending,
         createdAt: DateTime.tryParse(j['createdAt'] as String? ?? '') ??
             DateTime.now(),
       );
@@ -141,8 +142,18 @@ class Product {
         'stock': stock,
       };
 
+  static T? _byName<T extends Enum>(List<T> values, String name) {
+    for (final v in values) {
+      if (v.name == name) return v;
+    }
+    return null;
+  }
+
   static Set<T> _enums<T extends Enum>(List<Object?> names, List<T> values) =>
-      names.map((n) => values.byName(n as String)).toSet();
+      names
+          .map((n) => _byName(values, n as String))
+          .whereType<T>()
+          .toSet();
 }
 
 enum ProductApproval { pending, approved, rejected }
