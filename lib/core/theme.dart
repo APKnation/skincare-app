@@ -33,7 +33,7 @@ class AppTheme {
         height: 70,
         backgroundColor: scheme.surfaceContainerLow,
         elevation: 0,
-        labelBehavior: NavigationBarLabelBehavior.alwaysShow,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         indicatorColor: scheme.primaryContainer,
         indicatorShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),
@@ -100,7 +100,7 @@ class AppTheme {
           ),
         ),
       ),
-      fabTheme: FABThemeData(
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
         ),
