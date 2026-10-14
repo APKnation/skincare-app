@@ -35,6 +35,10 @@ class _ProductFormPageState extends State<ProductFormPage> {
       TextEditingController(text: widget.existing?.sideEffects.join('\n') ?? '');
   late final _warnings =
       TextEditingController(text: widget.existing?.warnings.join('\n') ?? '');
+  late final _imgUrl =
+      TextEditingController(text: widget.existing?.imageUrl ?? '');
+  bool _uploading = false;
+  final _picker = ImagePicker();
   late ProductCategory _category =
       widget.existing?.category ?? ProductCategory.facialOil;
   late final Set<SkinType> _skinTypes = {...?widget.existing?.suitableSkinTypes};
@@ -53,7 +57,8 @@ class _ProductFormPageState extends State<ProductFormPage> {
       _ingredients,
       _usage,
       _sideEffects,
-      _warnings
+      _warnings,
+      _imgUrl
     ]) {
       c.dispose();
     }
@@ -78,6 +83,8 @@ class _ProductFormPageState extends State<ProductFormPage> {
       category: _category,
       description: _description.text.trim(),
       priceTZS: int.parse(_price.text.trim()),
+      imageUrl:
+          _imgUrl.text.trim().isEmpty ? null : _imgUrl.text.trim(),
       ingredients: _split(_ingredients.text),
       suitableSkinTypes: {..._skinTypes},
       targetsConcerns: {..._concerns},
@@ -117,6 +124,24 @@ class _ProductFormPageState extends State<ProductFormPage> {
 
   void _showError(String message) => ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(message)));
+
+  Future<void> _pickAndUpload() async {
+    final file = await _picker.pickImage(
+        source: ImageSource.gallery, maxWidth: 1600, imageQuality: 82);
+    if (file == null) return;
+    setState(() => _uploading = true);
+    try {
+      final bytes = await file.readAsBytes();
+      var ext = file.path.split('.').last.toLowerCase();
+      if (!_allowedImageExts.contains(ext)) ext = 'jpg';
+      final url = await widget.store.uploadProductImage(bytes, ext: ext);
+      _imgUrl.text = url;
+    } catch (e) {
+      _showError('Image upload failed: $e');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
 
   Widget _multiChips<T extends Enum>(
           {required String title,
@@ -186,6 +211,8 @@ class _ProductFormPageState extends State<ProductFormPage> {
                     ? 'Write a helpful description (10+ characters)'
                     : null),
             const SizedBox(height: 12),
+            _photoSection(context),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
