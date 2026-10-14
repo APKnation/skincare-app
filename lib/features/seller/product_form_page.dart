@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../data/store.dart';
 import '../../models/enums.dart';
 import '../../models/product.dart';
+
+const _allowedImageExts = {'jpg', 'jpeg', 'png', 'webp', 'gif'};
 
 class ProductFormPage extends StatefulWidget {
   final Store store;

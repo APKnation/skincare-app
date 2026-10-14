@@ -249,6 +249,31 @@ class Store extends ChangeNotifier {
 
   // ---- products ----
 
+  /// Uploads image bytes to the backend. Returns the absolute image URL on
+  /// success, or throws [ApiException]-style via api.postBytes on failure.
+  Future<String> uploadProductImage(List<int> bytes,
+      {String ext = 'jpg'}) async {
+    final res = await api.postBytes('/api/upload', bytes, query: {'ext': ext});
+    final path = res['path'] as String;
+    return '${ApiClient.baseUrl}$path';
+  }
+
+  Future<String?> updateShopProfile({
+    required String shopName,
+    required String shopLocation,
+    required String shopDescription,
+    required String contactInfo,
+  }) async {
+    final error = await api.attempt('PUT', '/api/me/shop', body: {
+      'shopName': shopName,
+      'shopLocation': shopLocation,
+      'shopDescription': shopDescription,
+      'contactInfo': contactInfo,
+    });
+    if (error == null) await _refreshMe();
+    return error;
+  }
+
   List<Product> get approvedProducts => _catalog;
   List<Product> get myProducts => _myProducts;
   List<Product> get pendingProducts => _pendingProducts;

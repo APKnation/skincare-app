@@ -6,6 +6,7 @@ import 'package:shelf_router/shelf_router.dart';
 
 import 'package:sura_yangu_backend/api_core.dart';
 import 'package:sura_yangu_backend/api_orders.dart';
+import 'package:sura_yangu_backend/api_uploads.dart';
 import 'package:sura_yangu_backend/db.dart';
 import 'package:sura_yangu_backend/env.dart';
 import 'package:sura_yangu_backend/seed.dart';
@@ -25,6 +26,7 @@ Future<void> main(List<String> args) async {
   final router = Router();
   registerCoreRoutes(router, ctx);
   registerCartOrderRoutes(router, ctx);
+  registerUploadRoutes(router, ctx);
   router.get('/api/health', (Request request) => json({'ok': true}));
 
   final handler = const Pipeline()

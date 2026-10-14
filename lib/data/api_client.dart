@@ -62,6 +62,32 @@ class ApiClient {
     }
   }
 
+  /// Raw binary POST (image uploads). Returns the decoded JSON response.
+  Future<Map<String, Object?>> postBytes(
+    String path,
+    List<int> bytes, {
+    Map<String, String> query = const {},
+  }) async {
+    var uri = Uri.parse('$baseUrl$path');
+    if (query.isNotEmpty) uri = uri.replace(queryParameters: query);
+    final req = await _client.openUrl('POST', uri);
+    req.headers.contentType = ContentType.binary;
+    if (token != null) {
+      req.headers.set('authorization', 'Bearer $token');
+    }
+    req.add(bytes);
+    final resp = await req.close();
+    final text = await resp.transform(utf8.decoder).join();
+    final data = text.isEmpty ? <String, Object?>{} : jsonDecode(text);
+    if (resp.statusCode >= 400) {
+      final message = data is Map && data['error'] != null
+          ? data['error'] as String
+          : 'Server error (${resp.statusCode}).';
+      throw ApiException(message);
+    }
+    return data is Map<String, Object?> ? data : {'result': data};
+  }
+
   void close() => _client.close(force: true);
 }
 
