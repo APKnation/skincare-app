@@ -15,7 +15,16 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final me = store.currentUser!;
     return Scaffold(
-      appBar: AppBar(title: const Text('My profile')),
+      appBar: AppBar(
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('My Profile'),
+            Text('Account, shop access and security',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
+          ],
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

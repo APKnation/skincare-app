@@ -21,7 +21,14 @@ class ForYouPage extends StatelessWidget {
         : RecommendationEngine.rank(profile, store.approvedProducts);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('For You'),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('For You'),
+            Text('Matches picked from your skin profile',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),

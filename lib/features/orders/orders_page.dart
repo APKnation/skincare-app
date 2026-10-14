@@ -14,9 +14,33 @@ class OrdersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final orders = store.myOrders;
     return Scaffold(
-      appBar: AppBar(title: const Text('My orders')),
+      appBar: AppBar(
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('My Orders'),
+            Text('Track every purchase, start to delivery',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
+          ],
+        ),
+      ),
       body: orders.isEmpty
-          ? const Center(child: Text('No orders yet.'))
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.receipt_long_outlined,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.primaryContainer),
+                  const SizedBox(height: 12),
+                  Text('No orders yet',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text('Orders you place will appear here with live status.',
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            )
           : ListView.separated(
               padding: const EdgeInsets.all(12),
               itemCount: orders.length,

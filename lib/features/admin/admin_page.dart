@@ -56,7 +56,21 @@ class AdminPage extends StatelessWidget {
         length: 4,
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Administration'),
+            title: Row(
+              children: [
+                Icon(Icons.shield, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Administration'),
+                    Text('Approve, manage and moderate the marketplace',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w400)),
+                  ],
+                ),
+              ],
+            ),
             bottom: const TabBar(
               isScrollable: true,
               tabs: [

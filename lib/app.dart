@@ -12,6 +12,7 @@ import 'features/orders/orders_page.dart';
 import 'features/seller/seller_dashboard_page.dart';
 import 'features/skin/for_you_page.dart';
 import 'models/user.dart';
+import 'widgets/app_logo.dart';
 
 class SuraYanguApp extends StatefulWidget {
   const SuraYanguApp({super.key});
@@ -45,14 +46,56 @@ class _SuraYanguAppState extends State<SuraYanguApp> {
         listenable: store,
         builder: (context, _) {
           if (!store.isBootstrapped) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
+            return const _SplashScreen();
           }
           return store.isLoggedIn
               ? RootShell(key: ValueKey(store.currentUser!.id), store: store)
               : LoginScreen(store: store);
         },
+      ),
+    );
+  }
+}
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              scheme.surfaceContainerLowest,
+              scheme.primaryContainer.withValues(alpha: 0.45),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AppLogo(size: 88),
+              const SizedBox(height: 20),
+              Text('Sura Yangu',
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800, color: scheme.primary)),
+              const SizedBox(height: 6),
+              Text('Tanzania\'s trusted beauty market',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant, fontStyle: FontStyle.italic)),
+              const SizedBox(height: 28),
+              const SizedBox(
+                  width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 2.5)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -69,8 +112,10 @@ class RootShell extends StatefulWidget {
 
 class _RootShellState extends State<RootShell> {
   late final List<Widget> _pages;
-  late final List<NavigationDestination> _destinations;
   late final int _initialIndex;
+  int? _currentIndex;
+
+  int get _index => _currentIndex ?? _initialIndex;
 
   @override
   void initState() {
@@ -81,56 +126,81 @@ class _RootShellState extends State<RootShell> {
       ForYouPage(store: widget.store),
       CartPage(store: widget.store),
       OrdersPage(store: widget.store),
-      ProfilePage(store: widget.store),
-    ];
-    _destinations = [
-      const NavigationDestination(
-          icon: Icon(Icons.storefront_outlined), label: 'Browse'),
-      const NavigationDestination(
-          icon: Icon(Icons.auto_awesome_outlined), label: 'For You'),
-      NavigationDestination(
-        icon: Badge(
-          isLabelVisible: widget.store.cartCount > 0,
-          label: Text('${widget.store.cartCount}'),
-          child: const Icon(Icons.shopping_bag_outlined),
-        ),
-        label: 'Cart',
-      ),
-      const NavigationDestination(
-          icon: Icon(Icons.receipt_long_outlined), label: 'Orders'),
-      const NavigationDestination(
-          icon: Icon(Icons.person_outline), label: 'Profile'),
     ];
     if (me.role == UserRole.admin) {
       _pages.add(AdminPage(store: widget.store));
-      _destinations.add(const NavigationDestination(
-          icon: Icon(Icons.shield_outlined), label: 'Admin'));
     }
     if (me.role == UserRole.seller || me.sellerStatus != SellerStatus.none) {
       _pages.add(SellerDashboardPage(store: widget.store));
-      _destinations.add(const NavigationDestination(
-          icon: Icon(Icons.store_outlined), label: 'My Shop'));
     }
     // Role-based landing: admins open on Admin, sellers on their shop,
-    // customers on Browse.
+    // customers on Browse. Computed before Profile is appended last.
     _initialIndex = switch (me.role) {
       UserRole.admin || UserRole.seller => _pages.length - 1,
       UserRole.customer => 0,
     };
+    _pages.add(ProfilePage(store: widget.store));
+  }
+
+  List<NavigationDestination> _destinationsFor(User me) {
+    final cartCount = widget.store.cartCount;
+    Widget bag(bool filled) => Badge(
+          isLabelVisible: cartCount > 0,
+          backgroundColor: Theme.of(context).colorScheme.error,
+          label: Text('$cartCount',
+              style: const TextStyle(fontSize: 10, color: Colors.white)),
+          child: Icon(filled ? Icons.shopping_bag : Icons.shopping_bag_outlined),
+        );
+    return [
+      const NavigationDestination(
+        icon: Icon(Icons.storefront_outlined),
+        selectedIcon: Icon(Icons.storefront),
+        label: 'Shop',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.auto_awesome_outlined),
+        selectedIcon: Icon(Icons.auto_awesome),
+        label: 'For You',
+      ),
+      NavigationDestination(icon: bag(false), selectedIcon: bag(true), label: 'Cart'),
+      const NavigationDestination(
+        icon: Icon(Icons.receipt_long_outlined),
+        selectedIcon: Icon(Icons.receipt_long),
+        label: 'Orders',
+      ),
+      if (me.role == UserRole.admin)
+        const NavigationDestination(
+          icon: Icon(Icons.shield_outlined),
+          selectedIcon: Icon(Icons.shield),
+          label: 'Admin',
+        ),
+      if (me.role == UserRole.seller || me.sellerStatus != SellerStatus.none)
+        const NavigationDestination(
+          icon: Icon(Icons.store_outlined),
+          selectedIcon: Icon(Icons.store),
+          label: 'My Shop',
+        ),
+      const NavigationDestination(
+        icon: Icon(Icons.person_outline),
+        selectedIcon: Icon(Icons.person),
+        label: 'Profile',
+      ),
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        destinations: _destinations,
+    final me = widget.store.currentUser!;
+    return ListenableBuilder(
+      listenable: widget.store,
+      builder: (context, _) => Scaffold(
+        body: IndexedStack(index: _index, children: _pages),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _currentIndex = i),
+          destinations: _destinationsFor(me),
+        ),
       ),
     );
   }
-
-  int get _index => _currentIndex ?? _initialIndex;
-  int? _currentIndex;
 }

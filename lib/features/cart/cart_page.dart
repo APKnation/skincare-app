@@ -14,9 +14,38 @@ class CartPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = store.cart;
     return Scaffold(
-      appBar: AppBar(title: Text('Cart (${items.length})')),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Your Cart'),
+            Text(
+              items.isEmpty
+                  ? 'No items yet'
+                  : '${items.length} item(s) · ${formatTZS(store.cartSubtotal)}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
       body: items.isEmpty
-          ? const Center(child: Text('Your cart is empty.'))
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.shopping_bag_outlined,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.primaryContainer),
+                  const SizedBox(height: 12),
+                  Text('Your cart is empty',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text('Browse the Shop tab and tap a product to add it.',
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            )
           : ListView.separated(
               padding: const EdgeInsets.all(12),
               itemCount: items.length,

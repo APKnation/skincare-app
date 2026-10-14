@@ -4,6 +4,7 @@ import '../../data/store.dart';
 import '../../models/enums.dart';
 import '../../models/product.dart';
 import '../../widgets/product_card.dart';
+import '../../widgets/app_logo.dart';
 import '../product/compare_page.dart';
 import '../product/product_details_page.dart';
 
@@ -156,7 +157,29 @@ class _CatalogPageState extends State<CatalogPage> {
     final products = _filtered;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sura Yangu'),
+        titleSpacing: 16,
+        title: Row(
+          children: [
+            const AppLogo(size: 34),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Sura Yangu',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
+                  Text(
+                    'Karibu, ${store.currentUser?.name.split(' ').first ?? 'duka'} — find your match',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(108),
           child: Column(
