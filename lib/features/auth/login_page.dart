@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/store.dart';
 import 'register_page.dart';
@@ -36,6 +37,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _busy = false;
       _error = error;
     });
+    if (error == null) {
+      // Let Android's autofill service offer to save these credentials.
+      TextInput.finishAutofillContext(shouldSave: true);
+    }
   }
 
   @override
@@ -75,6 +80,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _email,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [
+                        AutofillHints.username,
+                        AutofillHints.email
+                      ],
                       decoration: const InputDecoration(labelText: 'Email'),
                       validator: (v) =>
                           (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
@@ -83,6 +93,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _password,
                       obscureText: true,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submit(),
+                      autofillHints: const [AutofillHints.password],
                       decoration: const InputDecoration(labelText: 'Password'),
                       validator: (v) =>
                           (v == null || v.isEmpty) ? 'Enter your password' : null,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/store.dart';
 
@@ -41,6 +42,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (!mounted) return;
     if (error == null) {
+      // Offer to save the new credentials with Android's autofill service.
+      TextInput.finishAutofillContext(shouldSave: true);
       Navigator.of(context).pop();
     } else {
       setState(() {
@@ -77,6 +80,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _email,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [
+                        AutofillHints.username,
+                        AutofillHints.email
+                      ],
                       decoration: const InputDecoration(labelText: 'Email'),
                       validator: (v) =>
                           (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
@@ -94,6 +102,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _password,
                       obscureText: true,
+                      autofillHints: const [AutofillHints.newPassword],
                       decoration: const InputDecoration(
                           labelText: 'Password (min 6 characters)'),
                       validator: (v) =>
