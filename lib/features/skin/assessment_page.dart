@@ -23,8 +23,7 @@ class _AssessmentPageState extends State<AssessmentPage> {
   @override
   void initState() {
     super.initState();
-    final existing =
-        widget.store.profileFor(widget.store.currentUserId ?? '');
+    final existing = widget.store.skinProfile;
     if (existing != null) {
       _skinType = existing.skinType;
       _concerns.addAll(existing.concerns);
@@ -40,8 +39,8 @@ class _AssessmentPageState extends State<AssessmentPage> {
     super.dispose();
   }
 
-  void _save() {
-    final userId = widget.store.currentUserId;
+  Future<void> _save() async {
+    final userId = widget.store.currentUser?.id;
     if (userId == null || _skinType == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Please choose your skin type.')));
@@ -52,7 +51,7 @@ class _AssessmentPageState extends State<AssessmentPage> {
           content: Text('Pick at least one concern or goal.')));
       return;
     }
-    widget.store.saveSkinProfile(SkinProfile(
+    final error = await widget.store.saveSkinProfile(SkinProfile(
       userId: userId,
       skinType: _skinType!,
       concerns: {..._concerns},
@@ -61,6 +60,12 @@ class _AssessmentPageState extends State<AssessmentPage> {
       notes: _notes.text,
       updatedAt: DateTime.now(),
     ));
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
     Navigator.of(context).pop();
   }
 
@@ -93,13 +98,20 @@ class _AssessmentPageState extends State<AssessmentPage> {
           Text('1. Your skin type',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          ...SkinType.values.map((t) => RadioListTile<SkinType>(
-                title: Text(t.label),
-                value: t,
-                groupValue: _skinType,
-                dense: true,
-                onChanged: (v) => setState(() => _skinType = v),
-              )),
+          RadioGroup<SkinType>(
+            groupValue: _skinType,
+            onChanged: (v) => setState(() => _skinType = v),
+            child: Column(
+              children: [
+                for (final t in SkinType.values)
+                  RadioListTile<SkinType>(
+                    title: Text(t.label),
+                    value: t,
+                    dense: true,
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
           Text('2. Skin concerns',
               style: Theme.of(context).textTheme.titleMedium),

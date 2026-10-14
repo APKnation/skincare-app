@@ -188,9 +188,10 @@ class _PasswordDialogState extends State<_PasswordDialog> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel')),
         FilledButton(
-          onPressed: () {
-            final error =
-                widget.store.changePassword(_current.text, _next.text);
+          onPressed: () async {
+            final error = await widget.store
+                .changePassword(_current.text, _next.text);
+            if (!context.mounted) return;
             if (error == null) {
               Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(

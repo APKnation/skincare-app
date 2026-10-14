@@ -93,6 +93,56 @@ class Product {
       createdAt: createdAt,
     );
   }
+
+  factory Product.fromJson(Map<String, Object?> j) => Product(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        brand: j['brand'] as String,
+        category: ProductCategory.values.byName(j['category'] as String),
+        description: j['description'] as String,
+        priceTZS: j['priceTZS'] as int,
+        imageUrl: j['imageUrl'] as String?,
+        ingredients: (j['ingredients'] as List).cast<String>(),
+        suitableSkinTypes: _enums<SkinType>(
+            j['suitableSkinTypes'] as List, SkinType.values),
+        targetsConcerns:
+            _enums<SkinConcern>(j['targetsConcerns'] as List, SkinConcern.values),
+        containsFlagged:
+            _enums<Sensitivity>(j['containsFlagged'] as List, Sensitivity.values),
+        isComedogenic: j['isComedogenic'] as bool? ?? false,
+        usageInstructions: j['usageInstructions'] as String? ?? '',
+        sideEffects: (j['sideEffects'] as List).cast<String>(),
+        warnings: (j['warnings'] as List).cast<String>(),
+        stock: j['stock'] as int,
+        sellerId: j['sellerId'] as String,
+        shopName: j['shopName'] as String,
+        shopLocation: j['shopLocation'] as String,
+        approval:
+            ProductApproval.values.byName(j['approval'] as String? ?? 'pending'),
+        createdAt: DateTime.tryParse(j['createdAt'] as String? ?? '') ??
+            DateTime.now(),
+      );
+
+  Map<String, Object?> toJson() => {
+        'name': name,
+        'brand': brand,
+        'category': category.name,
+        'description': description,
+        'priceTZS': priceTZS,
+        'imageUrl': imageUrl,
+        'ingredients': ingredients,
+        'suitableSkinTypes': suitableSkinTypes.map((e) => e.name).toList(),
+        'targetsConcerns': targetsConcerns.map((e) => e.name).toList(),
+        'containsFlagged': containsFlagged.map((e) => e.name).toList(),
+        'isComedogenic': isComedogenic,
+        'usageInstructions': usageInstructions,
+        'sideEffects': sideEffects,
+        'warnings': warnings,
+        'stock': stock,
+      };
+
+  static Set<T> _enums<T extends Enum>(List<Object?> names, List<T> values) =>
+      names.map((n) => values.byName(n as String)).toSet();
 }
 
 enum ProductApproval { pending, approved, rejected }

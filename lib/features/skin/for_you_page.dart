@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/formatters.dart';
 import '../../data/recommendation_engine.dart';
 import '../../data/store.dart';
+import '../../models/enums.dart';
 import '../../models/recommendation.dart';
 import '../product/product_details_page.dart';
 import 'assessment_page.dart';
@@ -14,7 +15,7 @@ class ForYouPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final profile = store.profileFor(store.currentUserId ?? '');
+    final profile = store.skinProfile;
     final recommendations = profile == null
         ? const <Recommendation>[]
         : RecommendationEngine.rank(profile, store.approvedProducts);
@@ -143,8 +144,9 @@ class ForYouPage extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton.tonal(
-                  onPressed: () {
-                    final error = store.addToCart(p.id);
+                  onPressed: () async {
+                    final error = await store.addToCart(p.id);
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text(error ?? '${p.name} added to cart')));
                   },

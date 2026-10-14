@@ -1,336 +1,354 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/cart.dart';
 import '../models/order.dart';
 import '../models/product.dart';
 import '../models/skin_profile.dart';
 import '../models/user.dart';
-import 'seed_data.dart';
+import 'api_client.dart';
 
-/// In-memory marketplace store. This plays the role of the backend server in
-/// the prototype: all authoritative state (users, products, orders) lives
-/// here, password verification and stock checks happen in one place, and the
-/// API surface maps 1:1 to future HTTP endpoints.
+/// API-backed marketplace state. Getters read the local cache (so widgets
+/// stay simple); every mutation goes to the backend first, then refreshes
+/// the affected slice. All authoritative data lives in PostgreSQL.
 class Store extends ChangeNotifier {
-  static Store seeded() => Store._seed();
+  Store(this.api);
 
-  Store._seed() {
+  static const _tokenKey = 'sura_yangu_token';
 
-    _users.addAll(
-      seedUsers.map((u) => u.copyWith(passwordHash: _hash(u.passwordHash))),
-    );
-    _products.addAll(seedProducts);
-    _nextProductIndex = _products.length + 1;
-    _nextOrderIndex = 100;
-  }
+  final ApiClient api;
 
-  final _users = <User>[];
-  final _products = <Product>[];
-  final _orders = <Order>[];
-  final _profiles = <String, SkinProfile>{};
-  final _carts = <String, List<CartItem>>{};
-  late int _nextProductIndex;
-  late int _nextOrderIndex;
-  String? _currentUserId;
-
-  static String _hash(String input) {
-    // Demo-only stand-in for server-side bcrypt/argon2. Never ship as-is.
-    var h = 0x811c9dc5;
-    for (final unit in input.codeUnits) {
-      h ^= unit;
-      h = (h * 0x01000193) & 0xFFFFFFFF;
-    }
-    return 'h${h.toRadixString(16)}';
-  }
+  User? _me;
+  List<Product> _catalog = const [];
+  List<Product> _myProducts = const [];
+  List<Product> _pendingProducts = const [];
+  List<Order> _myOrders = const [];
+  List<Order> _allOrders = const [];
+  List<User> _sellers = const [];
+  List<User> _users = const [];
+  List<CartItem> _cart = const [];
+  SkinProfile? _profile;
+  bool _bootstrapped = false;
 
   // ---- session ----
 
-  String? get currentUserId => _currentUserId;
-  User? get currentUser => byId(_currentUserId);
+  bool get isLoggedIn => _me != null && !_me!.deactivated;
+  User? get currentUser => _me;
+  bool get isBootstrapped => _bootstrapped;
 
-  User? byId(String? id) =>
-      id == null ? null : _users.where((u) => u.id == id).firstOrNull;
-
-  bool get isLoggedIn => currentUser != null && !currentUser!.deactivated;
-
-  String? login(String email, String password) {
-    final user = _users.where(
-      (u) => u.email.toLowerCase() == email.trim().toLowerCase(),
-    ).firstOrNull;
-    if (user == null || user.passwordHash != _hash(password)) {
-      return 'Wrong email or password.';
+  Future<void> bootstrap() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_tokenKey);
+    if (token != null) {
+      api.token = token;
+      try {
+        final me = await api.request('GET', '/api/me');
+        _me = User.fromJson(me);
+        await refresh();
+      } catch (_) {
+        await _clearSession();
+      }
     }
-    if (user.deactivated) {
-      return 'This account has been deactivated. Contact support.';
-    }
-    _currentUserId = user.id;
+    _bootstrapped = true;
     notifyListeners();
-    return null;
   }
 
-  String? register({
+  Future<String?> login(String email, String password) async {
+    try {
+      final res = await api.request('POST', '/api/auth/login',
+          body: {'email': email, 'password': password});
+      return await _afterAuth(res['token'] as String);
+    } on Exception catch (e) {
+      return e is ApiException ? e.message : 'Login failed: $e';
+    }
+  }
+
+  Future<String?> register({
     required String name,
     required String email,
     required String phone,
     required String password,
-  }) {
-    if (_users.any(
-      (u) => u.email.toLowerCase() == email.trim().toLowerCase(),
-    )) {
-      return 'An account with this email already exists.';
+  }) async {
+    try {
+      final res = await api.request('POST', '/api/auth/register', body: {
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'password': password,
+      });
+      return await _afterAuth(res['token'] as String);
+    } on Exception catch (e) {
+      return e is ApiException ? e.message : 'Registration failed: $e';
     }
-    final user = User(
-      id: 'u-${DateTime.now().millisecondsSinceEpoch}',
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      passwordHash: _hash(password),
-      createdAt: DateTime.now(),
-    );
-    _users.add(user);
-    _currentUserId = user.id;
+  }
+
+  Future<String?> _afterAuth(String token) async {
+    api.token = token;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, token);
+    final me = await api.request('GET', '/api/me');
+    _me = User.fromJson(me);
+    await refresh();
     notifyListeners();
     return null;
   }
 
-  void logout() {
-    _currentUserId = null;
+  Future<void> logout() async {
+    await api.attempt('POST', '/api/auth/logout');
+    await _clearSession();
     notifyListeners();
   }
 
-  String? updateProfile({
+  Future<void> _clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
+    api.token = null;
+    _me = null;
+    _cart = const [];
+    _myOrders = const [];
+    _myProducts = const [];
+    _profile = null;
+  }
+
+  Future<String?> updateProfile({
     required String name,
     required String email,
     required String phone,
-  }) {
-    final me = currentUser;
-    if (me == null) return 'Not logged in.';
-    if (_users.any((u) =>
-        u.id != me.id && u.email.toLowerCase() == email.trim().toLowerCase())) {
-      return 'That email belongs to another account.';
-    }
-    final index = _users.indexWhere((u) => u.id == me.id);
-    _users[index] = _users[index].copyWith(name: name.trim(), email: email.trim(), phone: phone.trim());
-    notifyListeners();
-    return null;
+  }) async {
+    final error = await api.attempt('PUT', '/api/me',
+        body: {'name': name, 'email': email, 'phone': phone});
+    if (error == null) await _refreshMe();
+    return error;
   }
 
-  String? changePassword(String current, String next) {
-    final me = currentUser;
-    if (me == null) return 'Not logged in.';
-    if (me.passwordHash != _hash(current)) return 'Current password is wrong.';
-    if (next.length < 6) return 'New password must be at least 6 characters.';
-    final index = _users.indexWhere((u) => u.id == me.id);
-    _users[index] = _users[index].copyWith(passwordHash: _hash(next));
-    notifyListeners();
-    return null;
+  Future<String?> changePassword(String current, String next) =>
+      api.attempt('PUT', '/api/me/password',
+          body: {'current': current, 'next': next});
+
+  Future<void> _refreshMe() async {
+    final me = await api.request('GET', '/api/me');
+    _me = User.fromJson(me);
   }
+
+  // ---- refresh slices ----
+
+  Future<void> refresh() async {
+    await Future.wait([
+      refreshCatalog(),
+      refreshCart(),
+      refreshSkinProfile(),
+      if (_me != null) refreshOrders(),
+      if (_me != null &&
+          (_me!.role == UserRole.seller || _me!.role == UserRole.admin))
+        refreshMyProducts(),
+      if (_me?.role == UserRole.admin) refreshAdmin(),
+    ]);
+    notifyListeners();
+  }
+
+  Future<void> refreshCatalog() async {
+    final rows = await api.request('GET', '/api/products');
+    _catalog = [
+      for (final p in asList(rows)) Product.fromJson(p),
+    ];
+    notifyListeners();
+  }
+
+  Future<void> refreshCart() async {
+    if (_me == null) return;
+    try {
+      final rows = await api.request('GET', '/api/me/cart');
+      _cart = [
+        for (final c in (rows['items'] as List? ?? [])
+            .cast<Map<String, Object?>>())
+          CartItem.fromJson(c),
+      ];
+    } on Exception {
+      _cart = const [];
+    }
+    notifyListeners();
+  }
+
+  Future<void> refreshSkinProfile() async {
+    if (_me == null) return;
+    try {
+      final res = await api.request('GET', '/api/me/skin-profile');
+      _profile = res.isEmpty || res['result'] == null
+          ? null
+          : SkinProfile.fromJson(_me!.id, res);
+    } on Exception {
+      _profile = null;
+    }
+    notifyListeners();
+  }
+
+  Future<void> refreshOrders() async {
+    final rows = await api.request('GET', '/api/orders');
+    _myOrders = [
+      for (final o in asList(rows)) Order.fromJson(o),
+    ];
+    notifyListeners();
+  }
+
+  Future<void> refreshMyProducts() async {
+    final rows = await api.request('GET', '/api/products/mine');
+    _myProducts = [
+      for (final p in asList(rows)) Product.fromJson(p),
+    ];
+    notifyListeners();
+  }
+
+  Future<void> refreshAdmin() async {
+    final sellers = await api.request('GET', '/api/admin/sellers');
+    _sellers = [
+      for (final u in asList(sellers)) User.fromJson(u),
+    ];
+    final users = await api.request('GET', '/api/admin/users');
+    _users = [
+      for (final u in asList(users)) User.fromJson(u),
+    ];
+    final orders = await api.request('GET', '/api/admin/orders');
+    _allOrders = [
+      for (final o in asList(orders)) Order.fromJson(o),
+    ];
+    final products = await api.request('GET', '/api/admin/products');
+    _pendingProducts = [
+      for (final p in asList(products)) Product.fromJson(p),
+    ];
+    notifyListeners();
+  }
+
+  static List<Map<String, Object?>> asList(Map<String, Object?> rows) =>
+      rows['result'] is List
+          ? (rows['result'] as List).cast<Map<String, Object?>>()
+          : const [];
 
   // ---- seller onboarding ----
 
-  String? applyForSeller({
+  Future<String?> applyForSeller({
     required String shopName,
     required String shopLocation,
     required String shopDescription,
     required String contactInfo,
-  }) {
-    final me = currentUser;
-    if (me == null) return 'Not logged in.';
-    if (me.sellerStatus == SellerStatus.approved) return null;
-    if (me.sellerStatus == SellerStatus.pending) {
-      return 'Your seller application is already under review.';
-    }
-    final index = _users.indexWhere((u) => u.id == me.id);
-    _users[index] = _users[index].copyWith(
-      sellerStatus: SellerStatus.pending,
-      shopName: shopName.trim(),
-      shopLocation: shopLocation.trim(),
-      shopDescription: shopDescription.trim(),
-      contactInfo: contactInfo.trim(),
-    );
-    notifyListeners();
-    return null;
+  }) async {
+    final error = await api.attempt('POST', '/api/me/seller-application', body: {
+      'shopName': shopName,
+      'shopLocation': shopLocation,
+      'shopDescription': shopDescription,
+      'contactInfo': contactInfo,
+    });
+    if (error == null) await _refreshMe();
+    return error;
   }
 
-  // ---- products / catalog ----
+  // ---- products ----
 
-  List<Product> get approvedProducts => _products
-      .where((p) => p.approval == ProductApproval.approved)
-      .toList(growable: false);
-
-  List<Product> get allProducts => List.unmodifiable(_products);
-
-  List<Product> productsBySeller(String sellerId) =>
-      _products.where((p) => p.sellerId == sellerId).toList();
-
-  List<Product> get pendingProducts => _products
-      .where((p) => p.approval == ProductApproval.pending)
-      .toList(growable: false);
+  List<Product> get approvedProducts => _catalog;
+  List<Product> get myProducts => _myProducts;
+  List<Product> get pendingProducts => _pendingProducts;
 
   Product? productById(String id) =>
-      _products.where((p) => p.id == id).firstOrNull;
+      _catalog.where((p) => p.id == id).firstOrNull;
 
-  List<String> get shopLocations => _products
+  List<String> get shopLocations => _catalog
       .map((p) => p.shopLocation)
       .toSet()
       .toList(growable: false)
     ..sort();
 
-  String? addProduct(Product draft) {
-    final me = currentUser;
-    if (me == null ||
-        (me.role != UserRole.seller && me.role != UserRole.admin)) {
-      return 'Only approved sellers can add products.';
+  Future<String?> addProduct(Product draft) async {
+    final error =
+        await api.attempt('POST', '/api/products', body: draft.toJson());
+    if (error == null) {
+      await Future.wait([refreshMyProducts(), refreshAdmin()]);
     }
-    if (me.role == UserRole.seller && me.sellerStatus != SellerStatus.approved) {
-      return 'Your seller account is not approved yet.';
-    }
-    _products.add(
-      draft.copyWith(
-        id: 'p-${_nextProductIndex++}',
-        sellerId: me.id,
-        shopName: me.shopName ?? draft.shopName,
-        shopLocation: me.shopLocation ?? draft.shopLocation,
-      ),
-    );
-    notifyListeners();
-    return null;
+    return error;
   }
 
-  String? updateProduct(Product updated) {
-    final me = currentUser;
-    final index = _products.indexWhere((p) => p.id == updated.id);
-    if (index == -1) return 'Product not found.';
-    if (me == null) return 'Not logged in.';
-    if (me.role != UserRole.admin && _products[index].sellerId != me.id) {
-      return 'You can only edit your own products.';
+  Future<String?> updateProduct(Product updated) async {
+    final error = await api
+        .attempt('PUT', '/api/products/${updated.id}', body: updated.toJson());
+    if (error == null) {
+      await Future.wait([
+        refreshCatalog(),
+        refreshMyProducts(),
+        if (_me?.role == UserRole.admin) refreshAdmin(),
+      ]);
     }
-    _products[index] = updated;
-    notifyListeners();
-    return null;
+    return error;
   }
 
-  String? deleteProduct(String productId) {
-    final me = currentUser;
-    if (me == null) return 'Not logged in.';
-    final product = productById(productId);
-    if (product == null) return 'Product not found.';
-    if (me.role != UserRole.admin && product.sellerId != me.id) {
-      return 'You can only delete your own products.';
+  Future<String?> deleteProduct(String productId) async {
+    final error = await api.attempt('DELETE', '/api/products/$productId');
+    if (error == null) {
+      await Future.wait([
+        refreshCatalog(),
+        refreshMyProducts(),
+        if (_me?.role == UserRole.admin) refreshAdmin(),
+      ]);
     }
-    _products.removeWhere((p) => p.id == productId);
-    notifyListeners();
-    return null;
+    return error;
   }
 
   // ---- admin ----
 
-  List<User> get sellers => _users
-      .where((u) =>
-          u.role == UserRole.seller || u.sellerStatus != SellerStatus.none)
-      .toList(growable: false);
+  List<User> get sellers => _sellers;
+  List<User> get managedUsers => _users;
+  List<Order> get allOrders => _allOrders;
 
-  List<User> get customers =>
-      _users.where((u) => u.role == UserRole.customer).toList(growable: false);
-
-  List<Order> get allOrders => List.unmodifiable(_orders);
-
-  String? setSellerStatus(String userId, SellerStatus status) {
-    final index = _users.indexWhere((u) => u.id == userId);
-    if (index == -1) return 'Seller not found.';
-    _users[index] = _users[index].copyWith(
-      sellerStatus: status,
-      role: status == SellerStatus.approved ? UserRole.seller : _users[index].role,
-    );
-    notifyListeners();
-    return null;
+  Future<String?> setSellerStatus(String userId, String status) async {
+    final error = await api
+        .attempt('PUT', '/api/admin/sellers/$userId/status', body: {
+      'status': status,
+    });
+    if (error == null) await refreshAdmin();
+    return error;
   }
 
-  String? reviewProduct(String productId, ProductApproval approval) {
-    final index = _products.indexWhere((p) => p.id == productId);
-    if (index == -1) return 'Product not found.';
-    _products[index] = _products[index].copyWith(approval: approval);
-    notifyListeners();
-    return null;
+  Future<String?> reviewProduct(String productId, String approval) async {
+    final error = await api
+        .attempt('PUT', '/api/admin/products/$productId/approval',
+            body: {'approval': approval});
+    if (error == null) {
+      await Future.wait([refreshCatalog(), refreshAdmin()]);
+    }
+    return error;
   }
 
-  String? setUserActive(String userId, bool active) {
-    final index = _users.indexWhere((u) => u.id == userId);
-    if (index == -1) return 'User not found.';
-    if (_users[index].role == UserRole.admin) return 'Admins cannot be deactivated.';
-    _users[index] = _users[index].copyWith(deactivated: !active);
-    if (!active && _currentUserId == userId) _currentUserId = null;
-    notifyListeners();
-    return null;
+  Future<String?> setUserActive(String userId, bool active) async {
+    final error = await api.attempt('PUT', '/api/admin/users/$userId/active',
+        body: {'active': active});
+    if (error == null) await refreshAdmin();
+    return error;
+  }
+
+  Future<String?> advanceOrder(String orderId, String status, String note) async {
+    final error = await api.attempt('PUT', '/api/admin/orders/$orderId/status',
+        body: {'status': status, 'note': note});
+    if (error == null) await refreshAdmin();
+    return error;
   }
 
   // ---- skin profile ----
 
-  SkinProfile? profileFor(String userId) => _profiles[userId];
+  SkinProfile? get skinProfile => _profile;
 
-  void saveSkinProfile(SkinProfile profile) {
-    _profiles[profile.userId] = profile;
+  Future<String?> saveSkinProfile(SkinProfile profile) async {
+    final error =
+        await api.attempt('PUT', '/api/me/skin-profile', body: profile.toJson());
+    if (error == null) _profile = profile;
     notifyListeners();
+    return error;
   }
 
   // ---- cart ----
 
-  List<CartItem> get cart =>
-      _currentUserId == null ? const [] : _carts[_currentUserId] ?? const [];
-
-  int get cartCount => cart.fold(0, (sum, i) => sum + i.quantity);
+  List<CartItem> get cart => _cart;
+  int get cartCount => _cart.fold(0, (sum, i) => sum + i.quantity);
 
   Product? productInCart(CartItem item) => productById(item.productId);
 
-  String? addToCart(String productId, {int quantity = 1}) {
-    final me = _currentUserId;
-    if (me == null) return 'Please log in first.';
-    final product = productById(productId);
-    if (product == null || product.approval != ProductApproval.approved) {
-      return 'Product unavailable.';
-    }
-    final list = _carts.putIfAbsent(me, () => []);
-    final index = list.indexWhere((i) => i.productId == productId);
-    final newQty = (index == -1 ? 0 : list[index].quantity) + quantity;
-    if (newQty > product.stock) {
-      return 'Only ${product.stock} left in stock.';
-    }
-    if (index == -1) {
-      list.add(CartItem(productId: productId, quantity: quantity));
-    } else {
-      list[index] = list[index].copyWith(quantity: newQty);
-    }
-    notifyListeners();
-    return null;
-  }
-
-  void setCartQuantity(String productId, int quantity) {
-    final me = _currentUserId;
-    if (me == null) return;
-    final list = _carts[me] ??= [];
-    final index = list.indexWhere((i) => i.productId == productId);
-    if (index == -1) return;
-    final product = productById(productId)!;
-    final clamped = quantity.clamp(0, product.stock);
-    if (clamped == 0) {
-      list.removeAt(index);
-    } else {
-      list[index] = list[index].copyWith(quantity: clamped);
-    }
-    notifyListeners();
-  }
-
-  void removeFromCart(String productId) =>
-      setCartQuantity(productId, 0);
-
-  void clearCart() {
-    if (_currentUserId != null) {
-      _carts[_currentUserId!] = [];
-      notifyListeners();
-    }
-  }
-
-  int get cartSubtotal => cart.fold(
+  int get cartSubtotal => _cart.fold(
         0,
         (sum, item) {
           final p = productById(item.productId);
@@ -338,135 +356,98 @@ class Store extends ChangeNotifier {
         },
       );
 
+  Future<String?> addToCart(String productId, {int quantity = 1}) async {
+    final error = await api.attempt('POST', '/api/me/cart',
+        body: {'productId': productId, 'quantity': quantity});
+    if (error == null) await refreshCart();
+    return error;
+  }
+
+  Future<String?> setCartQuantity(String productId, int quantity) async {
+    final error = await api.attempt('PUT', '/api/me/cart/$productId',
+        body: {'quantity': quantity});
+    if (error == null) await refreshCart();
+    return error;
+  }
+
+  Future<String?> removeFromCart(String productId) =>
+      setCartQuantity(productId, 0);
+
   int deliveryFeeFor(String city) =>
       city.trim().toLowerCase() == 'dar es salaam' ? 3000 : 5000;
 
   // ---- orders ----
 
-  List<Order> ordersFor(String userId) =>
-      _orders.where((o) => o.userId == userId).toList(growable: false);
+  List<Order> get myOrders => _myOrders;
 
-  Order? orderById(String id) => _orders.where((o) => o.id == id).firstOrNull;
+  Order? orderById(String id) => _myOrders.where((o) => o.id == id).firstOrNull ??
+      _allOrders.where((o) => o.id == id).firstOrNull;
 
-  String? placeOrder({
+  Future<String?> placeOrder({
     required String recipientName,
     required String recipientPhone,
     required String address,
     required String city,
     required String deliveryNotes,
     required PaymentMethod paymentMethod,
-  }) {
-    final me = _currentUserId;
-    if (me == null) return 'Please log in first.';
-    if (cart.isEmpty) return 'Your cart is empty.';
-    if (recipientName.trim().isEmpty || recipientPhone.trim().length < 9) {
-      return 'Enter a valid recipient name and phone number.';
+  }) async {
+    String? orderId;
+    try {
+      final res = await api.request('POST', '/api/orders', body: {
+        'recipientName': recipientName,
+        'recipientPhone': recipientPhone,
+        'address': address,
+        'city': city,
+        'deliveryNotes': deliveryNotes,
+        'paymentMethod': paymentMethod.name,
+      });
+      orderId = res['orderId'] as String?;
+    } on ApiException catch (e) {
+      return e.message;
+    } on Exception {
+      return 'Could not place the order.';
     }
-    if (address.trim().isEmpty || city.trim().isEmpty) {
-      return 'Enter a complete delivery address.';
+    await Future.wait([refreshOrders(), refreshCatalog()]);
+    return orderId == null ? 'Could not place the order.' : null;
+  }
+
+  /// Starts a mobile-money prompt. Returns provider prompt data or null.
+  Future<Map<String, Object?>?> payStart(String orderId) async {
+    try {
+      final res = await api.request('POST', '/api/orders/$orderId/pay/start');
+      return res;
+    } on ApiException {
+      return null;
+    } on Exception {
+      return null;
     }
-    for (final item in cart) {
-      final p = productById(item.productId);
-      if (p == null || p.approval != ProductApproval.approved) {
-        return 'A product in your cart is no longer available.';
-      }
-      if (item.quantity > p.stock) {
-        return 'Stock changed for ${p.name}. Adjust your cart.';
-      }
-    }
-    final lines = cart.map((item) {
-      final p = productById(item.productId)!;
-      return OrderLine(
-        productId: p.id,
-        name: p.name,
-        unitPriceTZS: p.priceTZS,
-        quantity: item.quantity,
+  }
+
+  /// Server verifies the transaction; the client never decides "paid".
+  Future<({bool success, String message})> payConfirm(
+      String orderId, String pin) async {
+    try {
+      final res = await api.request('POST', '/api/orders/$orderId/pay/confirm',
+          body: {'pin': pin});
+      await refreshOrders();
+      return (
+        success: res['success'] as bool? ?? false,
+        message: res['message'] as String? ?? 'Payment verified.',
       );
-    }).toList();
-    final subtotal = lines.fold(0, (sum, l) => sum + l.total);
-    final fee = deliveryFeeFor(city);
-    final now = DateTime.now();
-    final order = Order(
-      id: 'SY${_nextOrderIndex++}',
-      userId: me,
-      lines: lines,
-      subtotalTZS: subtotal,
-      deliveryFeeTZS: fee,
-      totalTZS: subtotal + fee,
-      recipientName: recipientName.trim(),
-      recipientPhone: recipientPhone.trim(),
-      address: address.trim(),
-      city: city.trim(),
-      deliveryNotes: deliveryNotes.trim(),
-      paymentMethod: paymentMethod,
-      paymentStatus: paymentMethod == PaymentMethod.cashOnDelivery
-          ? PaymentStatus.unpaid
-          : PaymentStatus.unpaid,
-      status: OrderStatus.placed,
-      timeline: [
-        OrderEvent(status: OrderStatus.placed, note: 'Order received', at: now),
-      ],
-    );
-    _orders.insert(0, order);
-    for (final item in cart) {
-      final index = _products.indexWhere((p) => p.id == item.productId);
-      _products[index] = _products[index]
-          .copyWith(stock: (_products[index].stock - item.quantity).clamp(0, 1 << 30));
+    } on Exception {
+      return (success: false, message: 'Payment could not be verified.');
     }
-    clearCart();
-    notifyListeners();
-    return null;
   }
 
-  /// Server-side payment verification result hook.
-  void markOrderPaid(String orderId, String paymentRef) {
-    final index = _orders.indexWhere((o) => o.id == orderId);
-    if (index == -1) return;
-    final now = DateTime.now();
-    _orders[index] = _orders[index].copyWith(
-      paymentStatus: PaymentStatus.paid,
-      paymentRef: paymentRef,
-      status: OrderStatus.confirmed,
-      timeline: [
-        ..._orders[index].timeline,
-        OrderEvent(
-          status: OrderStatus.confirmed,
-          note: 'Payment verified by provider ($paymentRef)',
-          at: now,
-        ),
-      ],
-    );
-    notifyListeners();
+  Future<String?> cancelOrder(String orderId) async {
+    final error = await api.attempt('PUT', '/api/orders/$orderId/cancel');
+    if (error == null) await refreshOrders();
+    return error;
   }
 
-  void markOrderPaymentFailed(String orderId) {
-    final index = _orders.indexWhere((o) => o.id == orderId);
-    if (index == -1) return;
-    _orders[index] = _orders[index].copyWith(paymentStatus: PaymentStatus.failed);
-    notifyListeners();
-  }
-
-  String? advanceOrder(String orderId, OrderStatus status, String note) {
-    final index = _orders.indexWhere((o) => o.id == orderId);
-    if (index == -1) return 'Order not found.';
-    _orders[index] = _orders[index].copyWith(
-      status: status,
-      timeline: [
-        ..._orders[index].timeline,
-        OrderEvent(status: status, note: note, at: DateTime.now()),
-      ],
-    );
-    notifyListeners();
-    return null;
-  }
-
-  String? cancelOrder(String orderId) {
-    final order = orderById(orderId);
-    if (order == null) return 'Order not found.';
-    if (order.status == OrderStatus.delivered ||
-        order.status == OrderStatus.cancelled) {
-      return 'This order can no longer be cancelled.';
-    }
-    return advanceOrder(orderId, OrderStatus.cancelled, 'Cancelled by customer');
+  @override
+  void dispose() {
+    api.close();
+    super.dispose();
   }
 }

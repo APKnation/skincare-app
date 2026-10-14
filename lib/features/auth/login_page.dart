@@ -25,10 +25,17 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  bool _busy = false;
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final error = widget.store.login(_email.text, _password.text);
-    setState(() => _error = error);
+    setState(() => _busy = true);
+    final error = await widget.store.login(_email.text, _password.text);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = error;
+    });
   }
 
   @override
@@ -88,7 +95,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: TextStyle(color: scheme.error)),
                       ),
                     const SizedBox(height: 16),
-                    FilledButton(onPressed: _submit, child: const Text('Log in')),
+                    FilledButton(
+                      onPressed: _busy ? null : _submit,
+                      child: _busy
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Log in'),
+                    ),
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: () => Navigator.of(context).push(

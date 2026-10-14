@@ -69,8 +69,9 @@ class ProductDetailsPage extends StatelessWidget {
                 ? 'Add to cart — ${formatTZS(live.priceTZS)}'
                 : 'Out of stock'),
             onPressed: live.stock > 0
-                ? () {
-                    final error = store.addToCart(live.id);
+                ? () async {
+                    final error = await store.addToCart(live.id);
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text(error ?? '${live.name} added to cart'),
                     ));

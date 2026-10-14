@@ -28,18 +28,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  bool _busy = false;
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final error = widget.store.register(
+    setState(() => _busy = true);
+    final error = await widget.store.register(
       name: _name.text,
       email: _email.text,
       phone: _phone.text,
       password: _password.text,
     );
+    if (!mounted) return;
     if (error == null) {
       Navigator.of(context).pop();
     } else {
-      setState(() => _error = error);
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
     }
   }
 
@@ -106,7 +113,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     const SizedBox(height: 20),
                     FilledButton(
-                        onPressed: _submit, child: const Text('Register')),
+                        onPressed: _busy ? null : _submit,
+                        child: Text(_busy ? 'Creating…' : 'Register')),
                   ],
                 ),
               ),

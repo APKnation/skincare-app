@@ -56,11 +56,12 @@ class _ProfileFormDialogState extends State<ProfileFormDialog> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel')),
         FilledButton(
-          onPressed: () {
-            final error = widget.store.updateProfile(
+          onPressed: () async {
+            final error = await widget.store.updateProfile(
                 name: _name.text, email: _email.text, phone: _phone.text);
+            if (!mounted) return;
             if (error == null) {
-              Navigator.of(context).pop();
+              Navigator.of(this.context).pop();
             } else {
               setState(() => _error = error);
             }

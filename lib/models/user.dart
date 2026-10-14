@@ -62,4 +62,22 @@ class User {
       createdAt: createdAt,
     );
   }
+
+  factory User.fromJson(Map<String, Object?> j) => User(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        email: j['email'] as String,
+        phone: j['phone'] as String,
+        passwordHash: '',
+        role: UserRole.values.byName(j['role'] as String? ?? 'customer'),
+        sellerStatus:
+            SellerStatus.values.byName(j['sellerStatus'] as String? ?? 'none'),
+        shopName: j['shopName'] as String?,
+        shopLocation: j['shopLocation'] as String?,
+        shopDescription: j['shopDescription'] as String?,
+        contactInfo: j['contactInfo'] as String?,
+        deactivated: j['deactivated'] as bool? ?? false,
+        createdAt: DateTime.tryParse(j['createdAt'] as String? ?? '') ??
+            DateTime.now(),
+      );
 }

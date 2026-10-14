@@ -123,4 +123,41 @@ class Order {
   }
 
   int get totalItems => lines.fold(0, (sum, l) => sum + l.quantity);
+
+  factory Order.fromJson(Map<String, Object?> j) => Order(
+        id: j['id'] as String,
+        userId: j['userId'] as String,
+        lines: [
+          for (final l in (j['lines'] as List).cast<Map<String, Object?>>())
+            OrderLine(
+              productId: l['productId'] as String,
+              name: l['name'] as String,
+              unitPriceTZS: l['unitPriceTZS'] as int,
+              quantity: l['quantity'] as int,
+            ),
+        ],
+        subtotalTZS: j['subtotalTZS'] as int,
+        deliveryFeeTZS: j['deliveryFeeTZS'] as int,
+        totalTZS: j['totalTZS'] as int,
+        recipientName: j['recipientName'] as String,
+        recipientPhone: j['recipientPhone'] as String,
+        address: j['address'] as String,
+        city: j['city'] as String,
+        deliveryNotes: j['deliveryNotes'] as String? ?? '',
+        paymentMethod:
+            PaymentMethod.values.byName(j['paymentMethod'] as String),
+        paymentStatus:
+            PaymentStatus.values.byName(j['paymentStatus'] as String),
+        paymentRef: j['paymentRef'] as String?,
+        status: OrderStatus.values.byName(j['status'] as String),
+        timeline: [
+          for (final e in (j['timeline'] as List)
+              .cast<Map<String, Object?>>())
+            OrderEvent(
+              status: OrderStatus.values.byName(e['status'] as String),
+              note: e['note'] as String,
+              at: DateTime.parse(e['at'] as String),
+            ),
+        ],
+      );
 }

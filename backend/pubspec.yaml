@@ -1,0 +1,10 @@
+name: sura_yangu_backend
+description: REST API for the Sura Yangu marketplace (PostgreSQL-backed).
+publish_to: none
+environment:
+  sdk: ^3.4.0
+dependencies:
+  shelf: ^1.4.0
+  shelf_router: ^1.1.0
+  postgres: ^3.4.0
+  crypto: ^3.0.0
