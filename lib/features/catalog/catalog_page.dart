@@ -157,6 +157,13 @@ class _CatalogPageState extends State<CatalogPage> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.store,
+      builder: (context, _) => _view(context),
+    );
+  }
+
+  Widget _view(BuildContext context) {
     final products = _filtered;
     return Scaffold(
       appBar: AppBar(

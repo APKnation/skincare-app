@@ -15,6 +15,13 @@ class ForYouPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => _view(context),
+    );
+  }
+
+  Widget _view(BuildContext context) {
     final profile = store.skinProfile;
     final recommendations = profile == null
         ? const <Recommendation>[]

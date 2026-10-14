@@ -12,6 +12,13 @@ class OrdersPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => _view(context),
+    );
+  }
+
+  Widget _view(BuildContext context) {
     final orders = store.myOrders;
     return Scaffold(
       appBar: AppBar(

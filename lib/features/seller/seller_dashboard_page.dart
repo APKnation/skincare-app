@@ -4,6 +4,7 @@ import '../../core/formatters.dart';
 import '../../data/store.dart';
 import '../../models/product.dart';
 import '../../models/user.dart';
+import '../../widgets/product_image.dart';
 import 'product_form_page.dart';
 
 class SellerDashboardPage extends StatefulWidget {
@@ -176,8 +177,15 @@ class _SellerDashboardPageState extends State<SellerDashboardPage> {
                       ),
                     ),
                     title: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(
-                        '${formatTZS(p.priceTZS)} · stock ${p.stock}'),
+                    subtitle: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                              '${formatTZS(p.priceTZS)} · stock ${p.stock}'),
+                        ),
+                        _approvalChip(p.approval),
+                      ],
+                    ),
                     trailing: PopupMenuButton<String>(
                       onSelected: (v) async {
                         if (v == 'edit') {
@@ -209,7 +217,7 @@ class _SellerDashboardPageState extends State<SellerDashboardPage> {
                             final error =
                                 await widget.store.deleteProduct(p.id);
                             if (error != null && mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              ScaffoldMessenger.of(this.context).showSnackBar(
                                   SnackBar(content: Text(error)));
                             }
                           }
@@ -363,7 +371,8 @@ class _SellerDashboardPageState extends State<SellerDashboardPage> {
                     backgroundColor: Colors.green.shade100,
                   ),
                 ],
-                if ((me.shopDescription ?? '').isNotEmpty) ...[
+              ),
+              if ((me.shopDescription ?? '').isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(me.shopDescription!,
                       style: Theme.of(context).textTheme.bodyMedium),
@@ -371,8 +380,7 @@ class _SellerDashboardPageState extends State<SellerDashboardPage> {
               ],
             ),
           ),
-        ),
-      );
+        );
 
   Widget _approvalChip(ProductApproval approval) =>
       switch (approval) {
