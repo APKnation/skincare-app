@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze --no-pub 2>&1 | tail -10)"
+    ]
+  }
+}
