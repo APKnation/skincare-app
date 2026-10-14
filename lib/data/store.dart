@@ -22,6 +22,7 @@ class Store extends ChangeNotifier {
   List<Product> _catalog = const [];
   List<Product> _myProducts = const [];
   List<Product> _pendingProducts = const [];
+  List<Product> _allProducts = const [];
   List<Order> _myOrders = const [];
   List<Order> _allOrders = const [];
   List<User> _sellers = const [];
@@ -215,6 +216,10 @@ class Store extends ChangeNotifier {
     _pendingProducts = [
       for (final p in asList(products)) Product.fromJson(p),
     ];
+    final allProducts = await api.request('GET', '/api/admin/products/all');
+    _allProducts = [
+      for (final p in asList(allProducts)) Product.fromJson(p),
+    ];
     notifyListeners();
   }
 
@@ -326,6 +331,70 @@ class Store extends ChangeNotifier {
     final error = await api.attempt('PUT', '/api/admin/orders/$orderId/status',
         body: {'status': status, 'note': note});
     if (error == null) await refreshAdmin();
+    return error;
+  }
+
+  List<Product> get allProducts => _allProducts;
+
+  Future<String?> adminCreateUser({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+    required String role,
+  }) async {
+    final error = await api.attempt('POST', '/api/admin/users', body: {
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'password': password,
+      'role': role,
+    });
+    if (error == null) await refreshAdmin();
+    return error;
+  }
+
+  Future<String?> adminUpdateUser(
+    String userId, {
+    required String name,
+    required String email,
+    required String phone,
+    required String role,
+  }) async {
+    final error = await api.attempt('PUT', '/api/admin/users/$userId', body: {
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'role': role,
+    });
+    if (error == null) await refreshAdmin();
+    return error;
+  }
+
+  Future<String?> adminDeleteUser(String userId) async {
+    final error = await api.attempt('DELETE', '/api/admin/users/$userId');
+    if (error == null) await refreshAdmin();
+    return error;
+  }
+
+  Future<String?> adminDeleteOrder(String orderId) async {
+    final error = await api.attempt('DELETE', '/api/admin/orders/$orderId');
+    if (error == null) await refreshAdmin();
+    return error;
+  }
+
+  Future<String?> deleteMyAccount() async {
+    final error = await api.attempt('DELETE', '/api/me');
+    if (error == null) {
+      await _clearSession();
+      _catalog = const [];
+      _allProducts = const [];
+      _pendingProducts = const [];
+      _sellers = const [];
+      _users = const [];
+      _allOrders = const [];
+      notifyListeners();
+    }
     return error;
   }
 

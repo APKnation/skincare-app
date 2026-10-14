@@ -197,6 +197,25 @@ void registerCoreRoutes(Router router, Ctx ctx) {
     return json({'ok': true});
   });
 
+  router.delete('/api/me', (Request request) async {
+    final user = await requireAuth(ctx, request, null);
+    if (user == null) return fail('Not logged in.', status: 401);
+    if (user['role'] == 'admin') {
+      return fail(
+          'Administrators cannot delete their own account. '
+          'Another admin must remove it.',
+          status: 403);
+    }
+    final id = user['id'] as String;
+    await ctx.db.q('DELETE FROM products WHERE seller_id = @id',
+        parameters: {'id': id});
+    await ctx.db.q('DELETE FROM orders WHERE user_id = @id',
+        parameters: {'id': id});
+    await ctx.db.q('DELETE FROM users WHERE id = @id',
+        parameters: {'id': id});
+    return json({'ok': true});
+  });
+
   router.put('/api/me/password', (Request request) async {
     final user = await requireAuth(ctx, request, null);
     if (user == null) return fail('Not logged in.', status: 401);

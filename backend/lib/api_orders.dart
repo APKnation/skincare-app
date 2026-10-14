@@ -4,6 +4,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
 import 'api_core.dart';
+import 'auth.dart';
 import 'pg.dart';
 
 final _rng = Random.secure();
@@ -429,6 +430,122 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     return json({'ok': true});
   });
 
+  router.post('/api/admin/users', (Request request) async {
+    final user = await auth(request);
+    if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
+    final body = await readBody(request);
+    final email = (body['email'] as String).trim().toLowerCase();
+    final password = body['password'] as String? ?? '';
+    final role = body['role'] as String? ?? 'customer';
+    if (!['customer', 'seller', 'admin'].contains(role)) {
+      return fail('Unknown role.', status: 400);
+    }
+    if (password.length < 6) {
+      return fail('Password must be at least 6 characters.', status: 400);
+    }
+    final clash = await ctx.db.q(
+      'SELECT 1 FROM users WHERE lower(email) = @e',
+      parameters: {'e': email},
+    );
+    if (clash.firstOrNull != null) {
+      return fail('An account with this email already exists.', status: 409);
+    }
+    final salt = makeSalt();
+    final rows = await ctx.db.q(
+      '''INSERT INTO users (name, email, phone, password_hash, password_salt, role)
+         VALUES (@n,@e,@p,@h,@s,@r) RETURNING id''',
+      parameters: {
+        'n': (body['name'] as String).trim(),
+        'e': email,
+        'p': (body['phone'] as String).trim(),
+        'h': hashPassword(password, salt),
+        's': salt,
+        'r': role,
+      },
+    );
+    return json({'id': rows.first[0]});
+  });
+
+  router.put('/api/admin/users/<id>', (Request request, String id) async {
+    final user = await auth(request);
+    if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
+    final target = await findUser(ctx, id);
+    if (target == null) return fail('User not found.', status: 404);
+    final body = await readBody(request);
+    final role = body['role'] as String? ?? target['role'];
+    if (!['customer', 'seller', 'admin'].contains(role)) {
+      return fail('Unknown role.', status: 400);
+    }
+    if (id == user!['id'] && role != target['role']) {
+      return fail('You cannot change your own role.', status: 400);
+    }
+    if (target['role'] == 'admin' && role != 'admin') {
+      final others = await ctx.db.q(
+        "SELECT count(*) FROM users WHERE role = 'admin' AND id <> @id",
+        parameters: {'id': id},
+      );
+      if ((others.first[0] as int) == 0) {
+        return fail('Cannot demote the last administrator.', status: 400);
+      }
+    }
+    final email = (body['email'] as String).trim().toLowerCase();
+    final clash = await ctx.db.q(
+      'SELECT 1 FROM users WHERE lower(email) = @e AND id <> @id',
+      parameters: {'e': email, 'id': id},
+    );
+    if (clash.firstOrNull != null) {
+      return fail('Another account already uses this email.', status: 409);
+    }
+    await ctx.db.q(
+      'UPDATE users SET name = @n, email = @e, phone = @p, role = @r '
+      'WHERE id = @id',
+      parameters: {
+        'n': (body['name'] as String).trim(),
+        'e': email,
+        'p': (body['phone'] as String).trim(),
+        'r': role,
+        'id': id,
+      },
+    );
+    return json({'ok': true});
+  });
+
+  router.delete('/api/admin/users/<id>',
+      (Request request, String id) async {
+    final user = await auth(request);
+    if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
+    if (id == user!['id']) {
+      return fail('You cannot delete your own account.', status: 400);
+    }
+    final target = await findUser(ctx, id);
+    if (target == null) return fail('User not found.', status: 404);
+    if (target['role'] == 'admin') {
+      final others = await ctx.db.q(
+        "SELECT count(*) FROM users WHERE role = 'admin' AND id <> @id",
+        parameters: {'id': id},
+      );
+      if ((others.first[0] as int) == 0) {
+        return fail('Cannot delete the last administrator.', status: 400);
+      }
+    }
+    await ctx.db.q('DELETE FROM products WHERE seller_id = @id',
+        parameters: {'id': id});
+    await ctx.db.q('DELETE FROM orders WHERE user_id = @id',
+        parameters: {'id': id});
+    await ctx.db.q('DELETE FROM users WHERE id = @id',
+        parameters: {'id': id});
+    return json({'ok': true});
+  });
+
+  router.get('/api/admin/products/all', (Request request) async {
+    final user = await auth(request);
+    if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
+    final rows = await ctx.db.q(
+      'SELECT $productColumns FROM products ORDER BY created_at DESC',
+    );
+    return json([for (final r in rows) rowToProduct(r)]);
+  });
+
   router.get('/api/admin/orders', (Request request) async {
     final user = await auth(request);
     if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
@@ -453,6 +570,20 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
         'n': body['note'] ?? 'Status updated by marketplace',
       },
     );
+    return json({'ok': true});
+  });
+
+  router.delete('/api/admin/orders/<id>',
+      (Request request, String id) async {
+    final user = await auth(request);
+    if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
+    final deleted = await ctx.db.q(
+      'DELETE FROM orders WHERE id = @id RETURNING id',
+      parameters: {'id': id},
+    );
+    if (deleted.firstOrNull == null) {
+      return fail('Order not found.', status: 404);
+    }
     return json({'ok': true});
   });
 }

@@ -118,6 +118,44 @@ class ProfilePage extends StatelessWidget {
             title: const Text('Log out'),
             onTap: store.logout,
           ),
+          if (me.role != UserRole.admin)
+            ListTile(
+              leading: Icon(Icons.person_off_outlined,
+                  color: Theme.of(context).colorScheme.error),
+              title: Text('Delete account',
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.error)),
+              subtitle: const Text(
+                  'Permanently removes your profile, products, cart and orders'),
+              onTap: () async {
+                final yes = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete account?'),
+                    content: const Text(
+                        'This cannot be undone. All of your data will be '
+                        'removed from the marketplace.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('Cancel')),
+                      FilledButton(
+                          style: FilledButton.styleFrom(
+                              backgroundColor:
+                                  Theme.of(ctx).colorScheme.error),
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('Delete forever')),
+                    ],
+                  ),
+                );
+                if (yes != true) return;
+                final error = await store.deleteMyAccount();
+                if (error != null && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(error)));
+                }
+              },
+            ),
         ],
       ),
     );
