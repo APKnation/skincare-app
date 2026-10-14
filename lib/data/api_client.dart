@@ -4,13 +4,15 @@ import 'dart:io';
 /// Thin HTTP client for the Sura Yangu backend.
 ///
 /// Base URL precedence: --dart-define=API_BASE_URL=... > default.
-/// Android emulators reach the host machine via 10.0.2.2; on a physical
-/// device or desktop, set the LAN URL, e.g.
-///   flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8181
+/// The default targets the phone's own localhost, which `adb reverse
+/// tcp:8181 tcp:8181` tunnels to the backend on this computer (works on
+/// physical devices and emulators). Other options:
+///   same Wi-Fi LAN:   --dart-define=API_BASE_URL=http://192.168.1.10:8181
+///   Android emulator: --dart-define=API_BASE_URL=http://10.0.2.2:8181
 class ApiClient {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8181',
+    defaultValue: 'http://127.0.0.1:8181',
   );
 
   String? token;

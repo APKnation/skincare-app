@@ -101,7 +101,6 @@ class _RootShellState extends State<RootShell> {
       const NavigationDestination(
           icon: Icon(Icons.person_outline), label: 'Profile'),
     ];
-    _initialIndex = 0;
     if (me.role == UserRole.admin) {
       _pages.add(AdminPage(store: widget.store));
       _destinations.add(const NavigationDestination(
@@ -114,11 +113,10 @@ class _RootShellState extends State<RootShell> {
     }
     // Role-based landing: admins open on Admin, sellers on their shop,
     // customers on Browse.
-    if (me.role == UserRole.admin) {
-      _initialIndex = _pages.length - 1;
-    } else if (me.role == UserRole.seller) {
-      _initialIndex = _pages.length - 1;
-    }
+    _initialIndex = switch (me.role) {
+      UserRole.admin || UserRole.seller => _pages.length - 1,
+      UserRole.customer => 0,
+    };
   }
 
   @override
