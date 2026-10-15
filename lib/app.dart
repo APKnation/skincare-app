@@ -8,11 +8,13 @@ import 'features/auth/login_page.dart';
 import 'features/auth/profile_page.dart';
 import 'features/cart/cart_page.dart';
 import 'features/catalog/catalog_page.dart';
+import 'features/customer/customer_dashboard_page.dart';
 import 'features/orders/orders_page.dart';
 import 'features/seller/seller_dashboard_page.dart';
+import 'features/seller/seller_finance_page.dart';
 import 'features/seller/seller_inventory_page.dart';
 import 'features/seller/seller_orders_page.dart';
-import 'features/skin/for_you_page.dart';
+
 import 'models/order.dart';
 import 'models/product.dart';
 import 'models/user.dart';
@@ -62,6 +64,8 @@ class _SuraYanguAppState extends State<SuraYanguApp> {
     );
   }
 }
+
+// ─── Splash Screen ─────────────────────────────────────────────────────────────
 
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
@@ -150,6 +154,8 @@ class _SplashScreen extends StatelessWidget {
   }
 }
 
+// ─── Root Shell ─────────────────────────────────────────────────────────────────
+
 class RootShell extends StatefulWidget {
   final Store store;
 
@@ -181,7 +187,7 @@ class _RootShellState extends State<RootShell> {
         me.role == UserRole.seller || me.sellerStatus == SellerStatus.approved;
     final isAdmin = me.role == UserRole.admin;
 
-    // If seller/admin toggled customer preview, show customer navigation
+    // Seller/Admin can preview the customer view to understand shopper experience
     final effectiveRole = _isCustomerPreview
         ? UserRole.customer
         : (isAdmin
@@ -197,8 +203,8 @@ class _RootShellState extends State<RootShell> {
     return Scaffold(
       body: Column(
         children: [
-          // Role Mode Banner for Seller or Admin
-          if (isAdmin || isSeller)
+          // Role Mode Banner — visible only for seller/admin, hides in preview
+          if ((isAdmin || isSeller) && !_isCustomerPreview)
             RoleBannerBar(
               roleTitle: isAdmin ? 'Admin Console' : 'Seller Workspace',
               subtitle: isAdmin
@@ -211,8 +217,9 @@ class _RootShellState extends State<RootShell> {
               isCustomerPreview: _isCustomerPreview,
               onToggleMode: _togglePreviewMode,
             ),
+          if (_isCustomerPreview)
+            _PreviewBanner(onExit: _togglePreviewMode),
 
-          // Main Screen Area
           Expanded(
             child: IndexedStack(
               index: safeIndex,
@@ -232,36 +239,55 @@ class _RootShellState extends State<RootShell> {
     );
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  //  PAGES — strict role isolation
+  // ──────────────────────────────────────────────────────────────────────────
+
   List<Widget> _buildPages(UserRole role) {
     return switch (role) {
+      // ── SELLER: manage their shop only, no buy/cart access ──────────────
       UserRole.seller => [
-          SellerDashboardPage(store: widget.store),
-          SellerInventoryPage(store: widget.store),
-          SellerOrdersPage(store: widget.store),
-          CatalogPage(store: widget.store),
-          ProfilePage(store: widget.store),
+          SellerDashboardPage(store: widget.store),   // 0 Overview / KPIs
+          SellerInventoryPage(store: widget.store),   // 1 My Products
+          SellerOrdersPage(store: widget.store),      // 2 Customer Orders
+          SellerFinancePage(store: widget.store),     // 3 Profit & Finance
+          ProfilePage(store: widget.store),           // 4 Profile / Shop
         ],
+
+      // ── ADMIN: platform operations only ─────────────────────────────────
       UserRole.admin => [
-          AdminOverviewPage(store: widget.store),
-          AdminSellersPage(store: widget.store),
-          AdminModerationPage(store: widget.store),
-          AdminPlatformOpsPage(store: widget.store),
-          ProfilePage(store: widget.store),
+          AdminOverviewPage(store: widget.store),     // 0 Platform Console
+          AdminSellersPage(store: widget.store),      // 1 Seller Management
+          AdminModerationPage(store: widget.store),   // 2 Product Moderation
+          AdminPlatformOpsPage(store: widget.store),  // 3 Users & Orders
+          ProfilePage(store: widget.store),           // 4 Admin Profile
         ],
+
+      // ── CUSTOMER: shop, track, pay, skin routine ─────────────────────────
       UserRole.customer => [
-          CatalogPage(store: widget.store),
-          ForYouPage(store: widget.store),
-          CartPage(store: widget.store),
-          OrdersPage(store: widget.store),
-          ProfilePage(store: widget.store),
+          CustomerDashboardPage(                      // 0 Personal Dashboard
+            store: widget.store,
+            onGoToShop: () => _onTabSelected(1),
+            onGoToOrders: () => _onTabSelected(3),
+            onGoToCart: () => _onTabSelected(2),
+          ),
+          CatalogPage(store: widget.store),           // 1 Shop / Browse
+          CartPage(store: widget.store),              // 2 Cart & Checkout
+          OrdersPage(store: widget.store),            // 3 My Orders
+          ProfilePage(store: widget.store),           // 4 Profile / Skin
         ],
     };
   }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  //  NAV ITEMS — matching pages above 1:1
+  // ──────────────────────────────────────────────────────────────────────────
 
   List<NavItem> _buildNavItems(UserRole role) {
     final cartCount = widget.store.cartCount;
 
     return switch (role) {
+      // ── SELLER nav ───────────────────────────────────────────────────────
       UserRole.seller => [
           const NavItem(
             icon: Icons.dashboard_outlined,
@@ -289,16 +315,18 @@ class _RootShellState extends State<RootShell> {
             badgeColor: Colors.blue.shade800,
           ),
           const NavItem(
-            icon: Icons.storefront_outlined,
-            activeIcon: Icons.storefront,
-            label: 'Market',
+            icon: Icons.bar_chart_outlined,
+            activeIcon: Icons.bar_chart,
+            label: 'Finance',
           ),
           const NavItem(
             icon: Icons.store_outlined,
             activeIcon: Icons.store,
-            label: 'Shop',
+            label: 'Shop Profile',
           ),
         ],
+
+      // ── ADMIN nav ────────────────────────────────────────────────────────
       UserRole.admin => [
           const NavItem(
             icon: Icons.analytics_outlined,
@@ -332,16 +360,18 @@ class _RootShellState extends State<RootShell> {
             label: 'Admin',
           ),
         ],
+
+      // ── CUSTOMER nav ─────────────────────────────────────────────────────
       UserRole.customer => [
+          const NavItem(
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home,
+            label: 'Home',
+          ),
           const NavItem(
             icon: Icons.storefront_outlined,
             activeIcon: Icons.storefront,
             label: 'Shop',
-          ),
-          const NavItem(
-            icon: Icons.spa_outlined,
-            activeIcon: Icons.spa,
-            label: 'Routine',
           ),
           NavItem(
             icon: Icons.shopping_bag_outlined,
@@ -369,5 +399,53 @@ class _RootShellState extends State<RootShell> {
       UserRole.seller => const Color(0xFF0F5132),
       UserRole.customer => const Color(0xFF1B5E40),
     };
+  }
+}
+
+// ─── Customer-preview banner for sellers/admins ────────────────────────────
+
+class _PreviewBanner extends StatelessWidget {
+  final VoidCallback onExit;
+
+  const _PreviewBanner({required this.onExit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF1565C0),
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top,
+        left: 12,
+        right: 8,
+        bottom: 6,
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.visibility_outlined, color: Colors.white70, size: 16),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Viewing as Customer — This is the shopper experience',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onExit,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Exit Preview',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 }
