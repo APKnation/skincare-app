@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -133,6 +134,15 @@ class AppTheme {
         unselectedLabelStyle: const TextStyle(fontSize: 13.5),
         indicatorColor: scheme.primary,
         dividerColor: Colors.transparent,
+      ),
+      pageTransitionsTheme: PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: const CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: const CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: const FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: const FadeUpwardsPageTransitionsBuilder(),
+        },
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: scheme.primary,

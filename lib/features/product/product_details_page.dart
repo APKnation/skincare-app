@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/formatters.dart';
 import '../../data/store.dart';
 import '../../models/product.dart';
-import '../../widgets/product_image.dart';
+import '../../widgets/customer_support_icon.dart';
+import '../../widgets/interactive_button.dart';
+import '../../widgets/magnetic_button.dart';
+import '../../widgets/zoomable_image.dart';
 
 class ProductDetailsPage extends StatelessWidget {
   final Store store;
@@ -20,12 +23,13 @@ class ProductDetailsPage extends StatelessWidget {
     final live = store.productById(product.id) ?? product;
     return Scaffold(
       appBar: AppBar(title: Text(live.name, maxLines: 1)),
+      floatingActionButton: const CustomerSupportIcon(),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: ProductImage(product: live, height: 220),
+          Hero(
+            tag: 'product-${live.id}',
+            child: ZoomableImage(imageUrl: live.imageUrl, height: 220),
           ),
           const SizedBox(height: 12),
           Text(live.name, style: Theme.of(context).textTheme.titleLarge),
@@ -63,21 +67,46 @@ class ProductDetailsPage extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 16),
-          FilledButton.icon(
-            icon: const Icon(Icons.add_shopping_cart),
-            label: Text(live.stock > 0
-                ? 'Add to cart — ${formatTZS(live.priceTZS)}'
-                : 'Out of stock'),
-            onPressed: live.stock > 0
-                ? () async {
-                    final error = await store.addToCart(live.id);
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(error ?? '${live.name} added to cart'),
-                    ));
-                  }
-                : null,
-          ),
+          if (live.stock > 0)
+            MagneticButton(
+              onPressed: () async {
+                final error = await store.addToCart(live.id);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(error ?? '${live.name} added to cart'),
+                  behavior: SnackBarBehavior.floating,
+                ));
+              },
+              child: InteractiveButton(
+                onPressed: () async {
+                  final error = await store.addToCart(live.id);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(error ?? '${live.name} added to cart'),
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                },
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.add_shopping_cart),
+                    label: Text('Add to cart — ${formatTZS(live.priceTZS)}'),
+                    onPressed: null,
+                  ),
+                ),
+              ),
+            )
+          else
+            InteractiveButton(
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.add_shopping_cart),
+                  label: const Text('Out of stock'),
+                  onPressed: null,
+                ),
+              ),
+            ),
         ],
       ),
     );

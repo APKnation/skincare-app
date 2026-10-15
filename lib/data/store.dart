@@ -372,7 +372,27 @@ class Store extends ChangeNotifier {
   Future<String?> advanceOrder(String orderId, String status, String note) async {
     final error = await api.attempt('PUT', '/api/admin/orders/$orderId/status',
         body: {'status': status, 'note': note});
-    if (error == null) await refreshAdmin();
+    if (error == null) {
+      await Future.wait([
+        refreshAdmin(),
+        refreshOrders(),
+        if (_me?.role == UserRole.seller) refreshSalesOrders(),
+      ]);
+    }
+    return error;
+  }
+
+  Future<String?> updateOrderStatus(String orderId, String status,
+      {String note = ''}) async {
+    final error = await api.attempt('PUT', '/api/orders/$orderId/status',
+        body: {'status': status, 'note': note});
+    if (error == null) {
+      await Future.wait([
+        refreshOrders(),
+        if (_me?.role == UserRole.seller) refreshSalesOrders(),
+        if (_me?.role == UserRole.admin) refreshAdmin(),
+      ]);
+    }
     return error;
   }
 

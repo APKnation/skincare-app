@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/transitions.dart';
 import '../../data/store.dart';
 import '../../models/enums.dart';
 import '../../models/product.dart';
+import '../../widgets/customer_support_icon.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/app_logo.dart';
 import '../product/compare_page.dart';
@@ -270,9 +272,8 @@ class _CatalogPageState extends State<CatalogPage> {
                           final items = _compare
                               .map((id) => store.productById(id)!)
                               .toList();
-                          Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) =>
-                                  ComparePage(store: store, products: items)));
+                          Navigator.of(context).push(SmoothPageRoute(
+                              page: ComparePage(store: store, products: items)));
                         },
                       ),
                     ),
@@ -282,6 +283,7 @@ class _CatalogPageState extends State<CatalogPage> {
           ),
         ),
       ),
+      floatingActionButton: const CustomerSupportIcon(),
       body: products.isEmpty
           ? const Center(child: Text('No products match your filters.'))
           : GridView.builder(
@@ -289,22 +291,19 @@ class _CatalogPageState extends State<CatalogPage> {
               gridDelegate:
                   const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      childAspectRatio: 0.68,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10),
+                      childAspectRatio: 0.65,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12),
               itemCount: products.length,
               itemBuilder: (context, i) {
                 final p = products[i];
-                return GestureDetector(
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) =>
-                          ProductDetailsPage(store: store, product: p))),
-                  child: ProductCard(
-                    product: p,
-                    onTap: () {},
-                    selectedForCompare: _compare.contains(p.id),
-                    onToggleCompare: () => _toggleCompare(p.id),
-                  ),
+                return ProductCard(
+                  product: p,
+                  store: store,
+                  onTap: () => Navigator.of(context).push(SmoothPageRoute(
+                      page: ProductDetailsPage(store: store, product: p))),
+                  selectedForCompare: _compare.contains(p.id),
+                  onToggleCompare: () => _toggleCompare(p.id),
                 );
               },
             ),

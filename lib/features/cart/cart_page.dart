@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/formatters.dart';
 import '../../data/store.dart';
+import '../../widgets/customer_support_icon.dart';
+import '../../widgets/interactive_button.dart';
+import '../../widgets/magnetic_button.dart';
 import '../product/product_details_page.dart';
 import 'checkout_page.dart';
 
@@ -80,11 +83,13 @@ class CartPage extends StatelessWidget {
                         icon: const Icon(Icons.add_circle_outline),
                         onPressed: () =>
                             store.setCartQuantity(p.id, item.quantity + 1),
-                      ),                    ],
+                      ),
+                    ],
                   ),
                 );
               },
             ),
+      floatingActionButton: const CustomerSupportIcon(),
       bottomNavigationBar: items.isEmpty
           ? null
           : SafeArea(
@@ -105,12 +110,19 @@ class CartPage extends StatelessWidget {
                         ],
                       ),
                     ),
-                    FilledButton(
+                    MagneticButton(
                       onPressed: () => Navigator.of(context).push(
                           MaterialPageRoute(
-                              builder: (_) =>
-                                  CheckoutPage(store: store))),
-                      child: const Text('Checkout'),
+                              builder: (_) => CheckoutPage(store: store))),
+                      child: InteractiveButton(
+                        onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => CheckoutPage(store: store))),
+                        child: FilledButton(
+                          onPressed: null,
+                          child: const Text('Checkout'),
+                        ),
+                      ),
                     ),
                   ],
                 ),

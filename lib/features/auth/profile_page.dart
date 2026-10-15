@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/store.dart';
 import '../../models/user.dart';
+import '../../widgets/advanced_card.dart';
 import '../admin/admin_page.dart';
 import '../seller/seller_dashboard_page.dart';
 import 'widgets/profile_form.dart';
@@ -21,6 +22,8 @@ class ProfilePage extends StatelessWidget {
 
   Widget _view(BuildContext context) {
     final me = store.currentUser!;
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Column(
@@ -33,116 +36,198 @@ class ProfilePage extends StatelessWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 90),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor:
-                            Theme.of(context).colorScheme.primaryContainer,
-                        child: Text(
-                          me.name.isNotEmpty ? me.name[0].toUpperCase() : '?',
-                          style: const TextStyle(fontSize: 20),
+          // User Card
+          AdvancedCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: scheme.primaryContainer,
+                      child: Text(
+                        me.name.isNotEmpty ? me.name[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: scheme.primary,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(me.name,
-                                style: Theme.of(context).textTheme.titleMedium),
-                            Text(me.email),
-                            Text(me.phone),
-                          ],
-                        ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  me.name,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              _roleChip(me),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(me.email,
+                              style: TextStyle(
+                                  fontSize: 12, color: scheme.onSurfaceVariant)),
+                          Text(me.phone,
+                              style: TextStyle(
+                                  fontSize: 12, color: scheme.onSurfaceVariant)),
+                        ],
                       ),
-                      _roleChip(me),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Edit profile'),
-                        onPressed: () => showDialog(
-                          context: context,
-                          builder: (_) => ProfileFormDialog(store: store),
-                        ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.lock_outline),
-                        label: const Text('Change password'),
-                        onPressed: () => showDialog(
-                          context: context,
-                          builder: (_) => _PasswordDialog(store: store),
-                        ),
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Edit profile',
+                          style: TextStyle(fontSize: 12)),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => ProfileFormDialog(store: store),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.lock_outline, size: 16),
+                      label: const Text('Change password',
+                          style: TextStyle(fontSize: 12)),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => _PasswordDialog(store: store),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+
+          // Portal navigation items
           if (me.role == UserRole.seller ||
               me.sellerStatus != SellerStatus.none)
-            ListTile(
-              leading: const Icon(Icons.store_outlined),
-              title: Text(me.shopName ?? 'My shop'),
-              subtitle: Text(_sellerStatusLabel(me.sellerStatus)),
-              trailing: const Icon(Icons.chevron_right),
+            AdvancedCard(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                     builder: (_) => SellerDashboardPage(store: store)),
               ),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.storefront_outlined,
+                      color: Colors.green.shade800),
+                ),
+                title: Text(me.shopName ?? 'My shop',
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(_sellerStatusLabel(me.sellerStatus)),
+                trailing: const Icon(Icons.chevron_right),
+              ),
             )
           else
-            ListTile(
-              leading: const Icon(Icons.sell_outlined),
-              title: const Text('Become a seller'),
-              subtitle: const Text('Apply to sell your products here'),
-              trailing: const Icon(Icons.chevron_right),
+            AdvancedCard(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                    builder: (_) =>
-                        SellerDashboardPage(store: store)),
+                    builder: (_) => SellerDashboardPage(store: store)),
+              ),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.sell_outlined, color: scheme.primary),
+                ),
+                title: const Text('Become a seller',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Apply to sell your products on Sura Yangu'),
+                trailing: const Icon(Icons.chevron_right),
               ),
             ),
+
           if (me.role == UserRole.admin)
-            ListTile(
-              leading: const Icon(Icons.shield_outlined),
-              title: const Text('Administration'),
-              subtitle: const Text(
-                  'Approve sellers, review products, manage users and orders'),
-              trailing: const Icon(Icons.chevron_right),
+            AdvancedCard(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => AdminPage(store: store)),
               ),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.shield_outlined,
+                      color: Colors.indigo.shade800),
+                ),
+                title: const Text('Administration Console',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text(
+                    'Approve sellers, review products, manage platform'),
+                trailing: const Icon(Icons.chevron_right),
+              ),
             ),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Log out'),
+
+          // Logout
+          AdvancedCard(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             onTap: store.logout,
+            child: const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.logout),
+              title: Text('Log out', style: TextStyle(fontWeight: FontWeight.w600)),
+              trailing: Icon(Icons.chevron_right),
+            ),
           ),
+
           if (me.role != UserRole.admin)
-            ListTile(
-              leading: Icon(Icons.person_off_outlined,
-                  color: Theme.of(context).colorScheme.error),
-              title: Text('Delete account',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.error)),
-              subtitle: const Text(
-                  'Permanently removes your profile, products, cart and orders'),
+            AdvancedCard(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               onTap: () async {
                 final yes = await showDialog<bool>(
                   context: context,
@@ -171,6 +256,16 @@ class ProfilePage extends StatelessWidget {
                       SnackBar(content: Text(error)));
                 }
               },
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.person_off_outlined,
+                    color: Theme.of(context).colorScheme.error),
+                title: Text('Delete account',
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+                subtitle: const Text(
+                    'Permanently removes your profile, products, cart and orders'),
+              ),
             ),
         ],
       ),
@@ -184,10 +279,42 @@ class ProfilePage extends StatelessWidget {
         SellerStatus.rejected => 'Application rejected',
       };
 
-  Widget _roleChip(User me) => Chip(
-        label: Text(me.role.name),
-        visualDensity: VisualDensity.compact,
-      );
+  Widget _roleChip(User me) {
+    final (label, color, bg) = switch (me.role) {
+      UserRole.admin => (
+          'Admin',
+          Colors.indigo.shade800,
+          Colors.indigo.shade50
+        ),
+      UserRole.seller => (
+          'Seller',
+          Colors.green.shade800,
+          Colors.green.shade50
+        ),
+      UserRole.customer => (
+          'Customer',
+          Colors.teal.shade800,
+          Colors.teal.shade50
+        ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
 }
 
 class _PasswordDialog extends StatefulWidget {

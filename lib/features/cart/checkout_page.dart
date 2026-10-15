@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/formatters.dart';
 import '../../data/store.dart';
 import '../../models/order.dart';
+import '../../widgets/customer_support_icon.dart';
+import '../../widgets/interactive_button.dart';
+import '../../widgets/magnetic_button.dart';
 import 'payment_sheet.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -144,7 +147,26 @@ class _CheckoutPageState extends State<CheckoutPage> {
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text('Product summary',
+                        style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    for (final item in widget.store.cart)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                                child: Text(item.productId,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis)),
+                            Text('x${item.quantity}'),
+                          ],
+                        ),
+                      ),
+                    const Divider(),
                     _row(context, 'Subtotal', formatTZS(subtotal)),
                     _row(context, 'Delivery',
                         formatTZS(widget.store.deliveryFeeFor(_city.text))),
@@ -159,20 +181,51 @@ class _CheckoutPageState extends State<CheckoutPage> {
               ),
             ),
             const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Shipping & delivery information',
+                        style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    Text(
+                        'Delivery fee: ${formatTZS(widget.store.deliveryFeeFor(_city.text))}. Lower fee for Dar es Salaam.',
+                        style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(
               'For your safety, mobile money is verified server-side before an '
               'order is confirmed. Sura Yangu never asks you to share your PIN '
               'with anyone — you enter it only on your own handset prompt.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                  onPressed: _busy ? null : _placeOrder,
-                  child: Text(_busy ? 'Placing order…' : 'Place order')),
-            ),
+            const SizedBox(height: 80),
           ],
+        ),
+      ),
+      floatingActionButton: const CustomerSupportIcon(),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: MagneticButton(
+            onPressed: _busy ? null : _placeOrder,
+            child: InteractiveButton(
+              onPressed: _busy ? null : _placeOrder,
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: null,
+                  child: Text(
+                      _busy ? 'Placing order…' : 'Place order — ${formatTZS(subtotal + widget.store.deliveryFeeFor(_city.text))}'),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

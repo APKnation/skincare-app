@@ -583,20 +583,73 @@ void registerCartOrderRoutes(Router router, Ctx ctx) {
     final user = await auth(request);
     if (!await isAdmin(user)) return fail('Forbidden.', status: 403);
     final body = await readBody(request);
+    final status = body['status'] as String;
     await ctx.db.q(
       'UPDATE orders SET status = @s WHERE id = @id',
-      parameters: {'s': body['status'], 'id': id},
+      parameters: {'s': status, 'id': id},
     );
     await ctx.db.q(
       'INSERT INTO order_events (order_id, status, note, at) '
       'VALUES (@id,@s,@n,now())',
       parameters: {
         'id': id,
-        's': body['status'],
+        's': status,
         'n': body['note'] ?? 'Status updated by marketplace',
       },
     );
     return json({'ok': true});
+  });
+
+  router.put('/api/orders/<id>/status', (Request request, String id) async {
+    final user = await auth(request);
+    if (user == null) return fail('Not logged in.', status: 401);
+    final body = await readBody(request);
+    final status = body['status'] as String;
+    if (user['role'] == 'admin') {
+      await ctx.db.q(
+        'UPDATE orders SET status = @s WHERE id = @id',
+        parameters: {'s': status, 'id': id},
+      );
+      await ctx.db.q(
+        'INSERT INTO order_events (order_id, status, note, at) '
+        'VALUES (@id,@s,@n,now())',
+        parameters: {
+          'id': id,
+          's': status,
+          'n': body['note'] ?? 'Status updated by admin',
+        },
+      );
+      return json({'ok': true});
+    }
+    if (user['role'] == 'seller') {
+      final mine = await ctx.db.q(
+        'SELECT 1 FROM order_lines ol JOIN products p ON p.id = ol.product_id '
+        'WHERE ol.order_id = @o AND p.seller_id = @s',
+        parameters: {'o': id, 's': user['id']},
+      );
+      if (mine.firstOrNull == null) {
+        return fail('Forbidden.', status: 403);
+      }
+      final allowed = {'confirmed', 'onTheWay', 'delivered'};
+      if (!allowed.contains(status)) {
+        return fail('You cannot set this status.', status: 403);
+      }
+      await ctx.db.q(
+        'UPDATE orders SET status = @s WHERE id = @id',
+        parameters: {'s': status, 'id': id},
+      );
+      await ctx.db.q(
+        'INSERT INTO order_events (order_id, status, note, at) '
+        'VALUES (@id,@s,@n,now())',
+        parameters: {
+          'id': id,
+          's': status,
+          'n': body['note'] ?? 'Status updated by seller',
+        },
+      );
+      return json({'ok': true});
+    }
+    return fail('Forbidden.', status: 403);
   });
 
   router.delete('/api/admin/orders/<id>',
