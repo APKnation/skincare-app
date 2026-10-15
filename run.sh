@@ -15,6 +15,10 @@ else
   echo "Backend already running on :8181"
 fi
 
-adb reverse tcp:8181 tcp:8181 && echo "Phone localhost:8181 -> PC:8181"
+DEVICE="$(adb devices | awk 'NR>1 && $2=="device" {print $1; exit}')"
+[ -n "$DEVICE" ] || { echo "No Android device attached. Connect one and retry."; exit 1; }
+echo "Target Android device: $DEVICE"
 
-exec flutter run "$@"
+adb -s "$DEVICE" reverse tcp:8181 tcp:8181 && echo "Phone localhost:8181 -> PC:8181"
+
+exec flutter run -d "$DEVICE" "$@"
