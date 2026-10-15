@@ -341,7 +341,7 @@ class _RootShellState extends State<RootShell> {
           const NavItem(
             icon: Icons.spa_outlined,
             activeIcon: Icons.spa,
-            label: 'For You',
+            label: 'Routine',
           ),
           NavItem(
             icon: Icons.shopping_bag_outlined,

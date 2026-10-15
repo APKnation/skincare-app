@@ -391,14 +391,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const Row(
                                   children: [
                                     Icon(
-                                      Icons.bolt_rounded,
+                                      Icons.people_outline,
                                       size: 16,
-                                      color: Color(0xFFFBBF24),
+                                      color: Color(0xFF93C5FD),
                                     ),
                                     SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
-                                        'Instant Demo Access',
+                                        'Demo Access — Tap to log in as:',
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: 12.5,
