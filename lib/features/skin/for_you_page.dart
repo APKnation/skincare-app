@@ -34,7 +34,7 @@ class ForYouPage extends StatelessWidget {
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('For You'),
+            Text('Skin Routine'),
             Text('Personalized routine & skin-matched cosmetics',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
           ],
@@ -61,7 +61,7 @@ class ForYouPage extends StatelessWidget {
                         color: scheme.primaryContainer.withValues(alpha: 0.4),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.face_retouching_natural,
+                      child: Icon(Icons.spa_outlined,
                           size: 56, color: scheme.primary),
                     ),
                     const SizedBox(height: 18),

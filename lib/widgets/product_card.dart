@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/formatters.dart';
 import '../data/store.dart';
+import '../features/cart/cart_page.dart';
 import '../models/enums.dart';
 import '../models/product.dart';
 import 'product_image.dart';
@@ -55,7 +56,7 @@ class _ProductCardState extends State<ProductCard> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 4),
         content: Row(
           children: [
             Icon(
@@ -69,9 +70,17 @@ class _ProductCardState extends State<ProductCard> {
                 error ?? '${widget.product.name} added to cart',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
           ],
+        ),
+        action: SnackBarAction(
+          label: 'VIEW CART',
+          textColor: const Color(0xFF6EE7B7),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => CartPage(store: store)),
+          ),
         ),
       ),
     );
@@ -410,43 +419,54 @@ class _ProductCardState extends State<ProductCard> {
                             // Quick Add Button
                             if (widget.store != null)
                               SizedBox(
-                                width: 34,
-                                height: 34,
+                                width: 38,
+                                height: 38,
                                 child: IconButton.filled(
                                   padding: EdgeInsets.zero,
                                   style: IconButton.styleFrom(
                                     backgroundColor: inCart > 0
-                                        ? scheme.primary
-                                        : scheme.primaryContainer,
-                                    foregroundColor: inCart > 0
-                                        ? scheme.onPrimary
-                                        : scheme.onPrimaryContainer,
+                                        ? const Color(0xFF1B5E40)
+                                        : scheme.primary,
+                                    foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
+                                    elevation: 2,
                                   ),
                                   icon: _isAdding
-                                      ? SizedBox(
-                                          width: 14,
-                                          height: 14,
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            color: inCart > 0
-                                                ? scheme.onPrimary
-                                                : scheme.primary,
+                                            color: Colors.white,
                                           ),
                                         )
                                       : inCart > 0
-                                          ? Text(
-                                              '$inCart',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w800,
-                                              ),
+                                          ? Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                const Icon(Icons.check,
+                                                    size: 13,
+                                                    color: Colors.white),
+                                                Text(
+                                                  '$inCart',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
                                             )
-                                          : const Icon(Icons.add, size: 18),
+                                          : const Icon(
+                                              Icons.add_shopping_cart,
+                                              size: 19,
+                                              color: Colors.white,
+                                            ),
                                   tooltip: inCart > 0
-                                      ? '$inCart in cart — add more'
+                                      ? '$inCart in cart — tap to add another'
                                       : 'Add to cart',
                                   onPressed: isOutOfStock
                                       ? null
