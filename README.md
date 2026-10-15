@@ -46,7 +46,7 @@ five-tab navigation per role, so a user never sees another role's screens:
 
 - **Customer** — Home dashboard, Shop, Cart, Orders, Profile.
 - **Seller** — Overview, Products, Orders, Finance, Shop Profile. No cart or checkout.
-- **Admin** — Console, Sellers, Moderation, Operations, Profile.
+- **Admin** — Console, Sellers, Moderation, Operations, Admin.
 
 Approved sellers and admins can toggle **Preview Shop** to see the customer
 experience; a blue banner marks the mode and one tap exits it.
@@ -63,9 +63,11 @@ sensitivities, goals) is saved per user. `RecommendationEngine.rank()` scores th
 approved catalog against it and the "For You" screen shows each match's score,
 reasons and precautions.
 
-**Catalog & product.** Filter by category, skin type, concern, shop location and
-price; compare up to three products side by side; product detail shows full
-ingredient data, usage, side effects and warnings, with stock-aware quantity.
+**Catalog & product.** Free-text search across name, brand, shop and ingredients,
+plus filters for category, suitable skin type, shop location and a max-price
+slider, with sorting by newest, price or name. Compare up to three products side
+by side; product detail shows full ingredient data, usage, side effects and
+warnings, with stock-aware quantity.
 
 **Cart & checkout.** Server-side cart, validated against live stock. Checkout
 captures recipient, address, city and delivery notes; delivery fee is TZS 3,000
@@ -186,7 +188,7 @@ precedence is `--dart-define` then the default `http://127.0.0.1:8181` (which th
 
 ## Demo accounts
 
-Seeded on an empty database by `backend/lib/seed.dart` (17 products across three
+Seeded on an empty database by `backend/lib/seed.dart` (16 products across three
 approved shops). Change these passwords before any real use.
 
 | Account | Email | Password | Role |
